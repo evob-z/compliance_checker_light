@@ -52,7 +52,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Deploy to Development Server (SSH)
         if: vars.DEPLOYMENT_TYPE == 'ssh'
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEV_SSH_HOST }}
           username: ${{ secrets.DEV_SSH_USER }}
@@ -100,7 +100,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Deploy to Docker Swarm
         if: vars.DEPLOYMENT_TYPE == 'swarm'
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEV_SSH_HOST }}
           username: ${{ secrets.DEV_SSH_USER }}

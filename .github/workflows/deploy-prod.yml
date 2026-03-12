@@ -126,7 +126,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Deploy to Production Server
         if: vars.DEPLOYMENT_TYPE == 'ssh'
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
