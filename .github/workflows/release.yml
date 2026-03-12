@@ -1,0 +1,159 @@
+# =============================================================================
+# Release Workflow - 版本发布车间
+# =============================================================================
+# 触发时机:
+#   - 推送以 v* 开头的标签 (如 v0.1.1, v1.0.0)
+#
+# 职责:
+#   - 自动生成变更日志
+#   - 创建 GitHub Release 页面
+#   - 打包源码为 ZIP
+#   - 更新 CHANGELOG.md
+#
+# 目标: 自动化版本发布流程，减少手动操作
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ==========================================================================
+  # Job 1: 更新 CHANGELOG
+  # ==========================================================================
+  changelog:
+    name: Update Changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate changelog
+        id: generate
+        run: |
+          VERSION=${{ github.ref_name }}
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          # 生成变更内容
+          echo "## What's Changed" > CHANGELOG.tmp
+          echo "" >> CHANGELOG.tmp
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s by @%an" --no-merges >> CHANGELOG.tmp
+          else
+            git log --pretty=format:"- %s by @%an" --no-merges >> CHANGELOG.tmp
+          fi
+          
+          echo "" >> CHANGELOG.tmp
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION}" >> CHANGELOG.tmp
+          
+          # 输出到步骤输出
+          echo 'content<<EOF' >> $GITHUB_OUTPUT
+          cat CHANGELOG.tmp >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION=${{ github.ref_name }}
+          DATE=$(date +%Y-%m-%d)
+          
+          # 创建新版本条目
+          echo "## [$VERSION] - $DATE" > NEW_CHANGELOG.md
+          echo "" >> NEW_CHANGELOG.md
+          cat CHANGELOG.tmp >> NEW_CHANGELOG.md
+          echo "" >> NEW_CHANGELOG.md
+          
+          # 合并到现有 CHANGELOG
+          if [ -f CHANGELOG.md ]; then
+            tail -n +3 CHANGELOG.md >> NEW_CHANGELOG.md
+          else
+            echo "# Changelog" >> NEW_CHANGELOG.md
+            echo "" >> NEW_CHANGELOG.md
+            echo "All notable changes to this project will be documented in this file." >> NEW_CHANGELOG.md
+            echo "" >> NEW_CHANGELOG.md
+          fi
+          
+          mv NEW_CHANGELOG.md CHANGELOG.md
+          rm CHANGELOG.tmp
+
+      - name: Commit CHANGELOG
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: update changelog for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin HEAD:${{ github.event.base_ref }} || echo "Push skipped"
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.tmp
+
+  # ==========================================================================
+  # Job 2: 创建 GitHub Release
+  # ==========================================================================
+  release:
+    name: Create Release
+    needs: changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          body_path: CHANGELOG.tmp
+          files: |
+            LICENSE
+            README.md
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==========================================================================
+  # Job 3: 打包源码
+  # ==========================================================================
+  package:
+    name: Package Source
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create source archive
+        run: |
+          VERSION=${{ github.ref_name }}
+          ARCHIVE_NAME="compliance-checker-${VERSION}.zip"
+          
+          # 创建源码包 (排除不需要的文件)
+          zip -r "${ARCHIVE_NAME}" . \
+            -x "*.git*" \
+            -x "*.pyc" \
+            -x "__pycache__/*" \
+            -x ".venv/*" \
+            -x "*.egg-info/*"
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: compliance-checker-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
