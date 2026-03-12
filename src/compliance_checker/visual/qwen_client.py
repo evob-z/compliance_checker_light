@@ -10,31 +10,55 @@ logger = logging.getLogger(__name__)
 
 
 class QwenVLClient:
-    """Qwen-VL 视觉模型客户端"""
-    
-    DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/api/v1"
-    DEFAULT_MODEL = "qwen-vl-plus"
-    
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model: Optional[str] = None
-    ):
+    """视觉模型客户端 - 默认使用 Qwen3-VL-Flash (OpenAI 兼容模式)"""
+
+    # 默认使用 OpenAI 兼容模式端点（支持 Qwen3-VL-Flash）
+    DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    DEFAULT_MODEL = "qwen3-vl-flash"
+
+    def __init__(self):
         """
-        初始化 Qwen-VL 客户端
-        
-        Args:
-            api_key: API密钥，默认从环境变量 QWEN_API_KEY 获取
-            base_url: API基础URL，默认从环境变量 QWEN_BASE_URL 获取
-            model: 模型名称，默认 qwen-vl-plus
+        初始化视觉模型客户端
+
+        配置优先级（从高到低）：
+        1. VISION_API_KEY / VISION_BASE_URL（专用配置）
+        2. LLM_API_KEY / LLM_BASE_URL（通用配置）
+
+        默认使用 Qwen3-VL-Flash 模型和 OpenAI 兼容模式端点。
+        如需使用其他视觉模型，请在 .env 中配置 VISION_MODEL 和 VISION_BASE_URL
         """
-        self.api_key = api_key or os.getenv("QWEN_API_KEY")
-        self.base_url = base_url or os.getenv("QWEN_BASE_URL", self.DEFAULT_BASE_URL)
-        self.model = model or self.DEFAULT_MODEL
-        
+        # API Key: 优先使用 VISION_API_KEY（专用配置），其次 LLM_API_KEY
+        vision_api_key = os.getenv("VISION_API_KEY", "").strip()
+        self.api_key = vision_api_key if vision_api_key else os.getenv("LLM_API_KEY", "").strip() or None
+
+        # Base URL: 优先使用 VISION_BASE_URL（专用配置），其次 LLM_BASE_URL
+        vision_base_url = os.getenv("VISION_BASE_URL", "").strip()
+        llm_base_url = os.getenv("LLM_BASE_URL", "").strip()
+
+        # Model: 使用 VISION_MODEL（如果配置），否则使用默认值
+        vision_model = os.getenv("VISION_MODEL", "").strip()
+        self.model = vision_model if vision_model else self.DEFAULT_MODEL
+
+        # 确定 Base URL
+        if vision_base_url:
+            # 用户配置了 VISION_BASE_URL，优先使用
+            self.base_url = vision_base_url
+        elif llm_base_url:
+            # 使用 LLM_BASE_URL（通用配置）
+            self.base_url = llm_base_url
+        else:
+            # 默认使用 OpenAI 兼容模式端点
+            self.base_url = self.DEFAULT_BASE_URL
+
+        # 判断是否使用 OpenAI 兼容模式
+        # OpenAI 兼容模式端点特征：包含 "compatible-mode" 或以 "/v1" 结尾
+        self.use_openai_format = (
+            "compatible-mode" in self.base_url or
+            self.base_url.rstrip("/").endswith("/v1")
+        )
+
         if not self.api_key:
-            logger.debug("QWEN_API_KEY not set, visual inspection will be unavailable")
+            logger.debug("Vision API key not set, visual inspection will be unavailable")
     
     def is_available(self) -> bool:
         """检查客户端是否可用（API key 是否配置）"""
@@ -89,30 +113,56 @@ class QwenVLClient:
                 "content": None
             }
         
-        # 构建请求
-        url = f"{self.base_url}/services/aigc/multimodal-generation/generation"
+        # 构建请求（根据端点类型选择格式）
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
         
-        payload = {
-            "model": self.model,
-            "input": {
+        if self.use_openai_format:
+            # OpenAI 兼容格式
+            url = f"{self.base_url}/chat/completions"
+            payload = {
+                "model": self.model,
                 "messages": [
                     {
                         "role": "user",
                         "content": [
-                            {"image": f"data:image/png;base64,{image_base64}"},
-                            {"text": prompt}
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_base64}"
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
                         ]
                     }
-                ]
-            },
-            "parameters": {
+                ],
                 "temperature": temperature
             }
-        }
+        else:
+            # 阿里云原生 API 格式
+            url = f"{self.base_url}/services/aigc/multimodal-generation/generation"
+            payload = {
+                "model": self.model,
+                "input": {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"image": f"data:image/png;base64,{image_base64}"},
+                                {"text": prompt}
+                            ]
+                        }
+                    ]
+                },
+                "parameters": {
+                    "temperature": temperature
+                }
+            }
         
         try:
             import aiohttp
@@ -120,10 +170,21 @@ class QwenVLClient:
                 async with session.post(url, headers=headers, json=payload) as resp:
                     if resp.status != 200:
                         text = await resp.text()
-                        logger.error(f"Qwen-VL API error: {resp.status} - {text}")
+                        logger.error(f"视觉模型 API error: {resp.status} - {text}")
+                        # 404 错误：模型或端点配置错误，标记为不可用
+                        if resp.status == 404:
+                            return {
+                                "success": False,
+                                "error": "视觉检查无法使用：模型或端点配置错误",
+                                "found": False,
+                                "confidence": 0.0,
+                                "reasoning": "视觉检查无法使用：请检查 VISION_MODEL 和 VISION_BASE_URL 配置",
+                                "content": None,
+                                "unavailable": True
+                            }
                         return {
                             "success": False,
-                            "error": f"API error: {resp.status} - {text}",
+                            "error": f"API error: {resp.status}",
                             "found": False,
                             "confidence": 0.0,
                             "reasoning": f"API error: {resp.status}",
@@ -132,12 +193,9 @@ class QwenVLClient:
                     
                     result = await resp.json()
                     
-                    # 解析响应
-                    if "output" in result and "choices" in result["output"]:
-                        content = result["output"]["choices"][0]["message"]["content"]
-                        # 处理列表格式（新版 API）
-                        if isinstance(content, list):
-                            content = "\n".join([item.get("text", "") if isinstance(item, dict) else str(item) for item in content])
+                    # 解析响应（支持 OpenAI 兼容格式和阿里云原生格式）
+                    content = self._extract_content_from_response(result)
+                    if content is not None:
                         # 解析检测结果
                         parsed = self.parse_detection_result(content)
                         return {
@@ -223,6 +281,44 @@ class QwenVLClient:
 请确保回答简洁明确。"""
         
         return await self.chat(image_path, prompt)
+    
+    def _extract_content_from_response(self, result: Dict[str, Any]) -> Optional[str]:
+        """
+        从 API 响应中提取内容文本
+        支持 OpenAI 兼容格式和阿里云原生格式
+        """
+        try:
+            # OpenAI 兼容格式: choices[0].message.content
+            if "choices" in result:
+                choice = result["choices"][0]
+                if "message" in choice:
+                    content = choice["message"].get("content")
+                else:
+                    content = choice.get("text")
+                
+                # 处理列表格式（新版 API）
+                if isinstance(content, list):
+                    content = "\n".join([
+                        item.get("text", "") if isinstance(item, dict) else str(item)
+                        for item in content
+                    ])
+                return content
+            
+            # 阿里云原生格式: output.choices[0].message.content
+            if "output" in result and "choices" in result["output"]:
+                content = result["output"]["choices"][0]["message"]["content"]
+                # 处理列表格式
+                if isinstance(content, list):
+                    content = "\n".join([
+                        item.get("text", "") if isinstance(item, dict) else str(item)
+                        for item in content
+                    ])
+                return content
+            
+            return None
+        except (KeyError, IndexError, TypeError) as e:
+            logger.warning(f"Failed to extract content from response: {e}")
+            return None
     
     def parse_detection_result(self, content) -> Dict[str, Any]:
         """
