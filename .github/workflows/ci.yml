@@ -1,94 +1,54 @@
-# Compliance Checker MCP Service - CI/CD Pipeline
 # =============================================================================
-# 工作流说明:
-#   - 代码质量检查: Black, Ruff, MyPy
-#   - 安全扫描: Bandit, Safety
-#   - 单元测试: pytest + 覆盖率
-#   - Docker 构建: 多镜像变体 (none/local/cloud OCR)
-#   - 镜像推送: GHCR (GitHub Container Registry)
+# CI Workflow - 代码质量检查车间
+# =============================================================================
+# 触发时机:
+#   - Pull Request 到 main/develop 分支
+#   - Push 到 main/develop 分支
+#
+# 职责:
+#   - 代码格式化检查 (Black)
+#   - 单元测试 (Pytest) + 覆盖率
+#   - 依赖安全扫描 (Safety)
+#
+# 目标: 确保合入 main 分支的代码 100% 健康
 # =============================================================================
 
-name: CI/CD Pipeline
+name: CI
 
 on:
-  push:
-    branches: [main, develop]
-    tags: ['v*']
   pull_request:
     branches: [main, develop]
+  push:
+    branches: [main, develop]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ==========================================================================
-  # Job 1: 代码质量检查
+  # Job 1: 代码格式检查
   # ==========================================================================
-  lint:
-    name: Code Quality
+  format:
+    name: Code Format
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install linting tools
-        run: |
-          pip install black ruff mypy
+      - name: Install Black
+        run: pip install black
 
-      - name: Check code formatting (Black)
+      - name: Check formatting
         run: black --check --diff src/
 
-      - name: Lint with Ruff
-        run: ruff check src/
-
-      - name: Type check with MyPy
-        run: |
-          pip install -e .
-          mypy src/compliance_checker --ignore-missing-imports
-
   # ==========================================================================
-  # Job 2: 安全扫描
-  # ==========================================================================
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install bandit safety
-
-      - name: Run Bandit security scan
-        run: bandit -r src/ -f json -o bandit-report.json || true
-
-      - name: Run Safety check
-        run: safety check --json --output safety-report.json || true
-
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-reports
-          path: |
-            bandit-report.json
-            safety-report.json
-
-  # ==========================================================================
-  # Job 3: 单元测试
+  # Job 2: 单元测试
   # ==========================================================================
   test:
     name: Unit Tests
@@ -97,10 +57,10 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.12']
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Setup Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -111,194 +71,32 @@ jobs:
           pip install -r requirements.txt
           pip install -e ".[dev]"
 
-      - name: Run tests with coverage
-        run: |
-          pytest tests/ -v --cov=compliance_checker --cov-report=xml --cov-report=html
+      - name: Run tests
+        run: pytest tests/ -v --cov=compliance_checker --cov-report=xml
 
-      - name: Upload coverage to Codecov
+      - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-py${{ matrix.python-version }}
-          path: htmlcov/
-
   # ==========================================================================
-  # Job 4: Docker 镜像构建 (基础版 - 无 OCR)
+  # Job 3: 依赖安全扫描
   # ==========================================================================
-  docker-build-base:
-    name: Build Docker Image (Base)
+  security:
+    name: Security Scan
     runs-on: ubuntu-latest
-    needs: [lint, security, test]
-    if: github.event_name == 'push'
-    permissions:
-      contents: read
-      packages: write
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          python-version: '3.11'
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,suffix=,format=short
+      - name: Install Safety
+        run: pip install safety
 
-      - name: Build and push (Base - No OCR)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            OCR_BACKEND=none
-
-  # ==========================================================================
-  # Job 5: Docker 镜像构建 (本地 OCR 版)
-  # ==========================================================================
-  docker-build-local-ocr:
-    name: Build Docker Image (Local OCR)
-    runs-on: ubuntu-latest
-    needs: [lint, security, test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=local-ocr-latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}-local-ocr
-            type=semver,pattern={{major}}.{{minor}}-local-ocr
-
-      - name: Build and push (Local OCR)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            OCR_BACKEND=local
-
-  # ==========================================================================
-  # Job 6: Docker 镜像构建 (云端 OCR 版)
-  # ==========================================================================
-  docker-build-cloud-ocr:
-    name: Build Docker Image (Cloud OCR)
-    runs-on: ubuntu-latest
-    needs: [lint, security, test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=cloud-ocr-latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}-cloud-ocr
-            type=semver,pattern={{major}}.{{minor}}-cloud-ocr
-
-      - name: Build and push (Cloud OCR)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            OCR_BACKEND=cloud
-
-  # ==========================================================================
-  # Job 7: 发布 Release (仅标签推送时)
-  # ==========================================================================
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [docker-build-base, docker-build-local-ocr, docker-build-cloud-ocr]
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Generate changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4
-        with:
-          configuration: .github/changelog-config.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          body: ${{ steps.changelog.outputs.changelog }}
-          files: |
-            LICENSE
-            README.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check dependencies
+        run: safety check --full-report

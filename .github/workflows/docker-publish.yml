@@ -1,0 +1,220 @@
+# =============================================================================
+# Docker Publish Workflow - 容器镜像物流中心
+# =============================================================================
+# 触发时机:
+#   - Release 发布完成后 (workflow_run)
+#
+# 职责:
+#   - 构建三种镜像变体 (base/local-ocr/cloud-ocr)
+#   - 推送到 GitHub Container Registry (GHCR)
+#
+# 目标: 提供多种部署选项，满足不同环境需求
+# =============================================================================
+
+name: Docker Publish
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ==========================================================================
+  # Job 1: 构建并推送基础镜像
+  # ==========================================================================
+  build-base:
+    name: Build Base Image
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: |
+          # 从 release 工作流获取版本号
+          VERSION=${{ github.event.workflow_run.head_branch }}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push (Base - No OCR)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            OCR_BACKEND=none
+
+  # ==========================================================================
+  # Job 2: 构建并推送 Local OCR 镜像
+  # ==========================================================================
+  build-local-ocr:
+    name: Build Local OCR Image
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${{ github.event.workflow_run.head_branch }}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.VERSION }}-local-ocr
+            type=raw,value=local-ocr-latest,enable={{is_default_branch}}
+
+      - name: Build and push (Local OCR)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            OCR_BACKEND=local
+
+  # ==========================================================================
+  # Job 3: 构建并推送 Cloud OCR 镜像
+  # ==========================================================================
+  build-cloud-ocr:
+    name: Build Cloud OCR Image
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${{ github.event.workflow_run.head_branch }}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.VERSION }}-cloud-ocr
+            type=raw,value=cloud-ocr-latest,enable={{is_default_branch}}
+
+      - name: Build and push (Cloud OCR)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            OCR_BACKEND=cloud
+
+  # ==========================================================================
+  # Job 4: 更新 Release 说明 (添加镜像信息)
+  # ==========================================================================
+  update-release:
+    name: Update Release Notes
+    needs: [build-base, build-local-ocr, build-cloud-ocr]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${{ github.event.workflow_run.head_branch }}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update release with image info
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          append_body: true
+          body: |
+
+            ## Docker Images
+
+            以下镜像已构建并推送到 GHCR:
+
+            | 镜像变体 | 拉取命令 |
+            |---------|---------|
+            | Base (无 OCR) | `docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}` |
+            | Local OCR | `docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-local-ocr` |
+            | Cloud OCR | `docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-cloud-ocr` |
+
+            **镜像说明:**
+            - **Base**: 最小化镜像，仅支持可编辑 PDF (~300MB)
+            - **Local OCR**: 集成 PaddleOCR，支持扫描件 (~800MB)
+            - **Cloud OCR**: 集成阿里云 OCR，轻量但需网络 (~350MB)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
