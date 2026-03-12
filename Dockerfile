@@ -14,7 +14,7 @@
 #   docker build --build-arg OCR_BACKEND=cloud -t compliance-checker:cloud-ocr .
 # =============================================================================
 
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # 构建参数定义
 ARG OCR_BACKEND=none
