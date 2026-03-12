@@ -60,9 +60,9 @@ BOTH_DETECTION_PROMPT = """请仔细检查这张图片，判断是否存在公�
 
 class VisualInspector:
     """视觉检查器 - 两阶段检测：OCR 定位 → 视觉确认"""
-    
-    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
-        self.qwen_client = QwenVLClient(api_key=api_key, base_url=base_url)
+
+    def __init__(self):
+        self.qwen_client = QwenVLClient()
         self.region_detector = PDFRegionDetector()
     
     async def inspect(

@@ -22,46 +22,59 @@ logger = logging.getLogger(__name__)
 
 
 class LLMSemanticMatcher:
-    """语义匹配器 - 使用 LLM 嵌入模型计算文件名相似度"""
-    
+    """语义匹配器 - 使用嵌入模型计算文件名相似度"""
+
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         self._client = None
         self._cache = {}  # 简单的嵌入缓存
-    
-    def _get_client(self):
-        """延迟加载 LLM 客户端"""
+
+    def _get_embed_client(self):
+        """延迟加载嵌入模型客户端（支持独立的 EMBED_API_KEY）"""
         if self._client is None:
             try:
-                from ..llm.client import get_llm_client
-                self._client = get_llm_client()
+                import openai
+                # 使用独立的嵌入模型配置，如果没有配置则回退到 LLM 配置
+                api_key = os.getenv("EMBED_API_KEY") or os.getenv("LLM_API_KEY")
+                base_url = os.getenv("EMBED_BASE_URL") or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+
+                if not api_key:
+                    raise ValueError("未配置 EMBED_API_KEY 或 LLM_API_KEY")
+
+                self._client = openai.AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    timeout=float(os.getenv("EMBED_TIMEOUT", "30")),
+                    max_retries=int(os.getenv("EMBED_MAX_RETRIES", "3"))
+                )
+                logger.debug(f"嵌入模型客户端初始化成功: {base_url}")
             except Exception as e:
-                logger.warning(f"LLM 客户端初始化失败: {e}")
+                logger.debug(f"嵌入模型客户端初始化失败: {e}")
                 raise
         return self._client
     
     async def _get_embedding(self, text: str) -> List[float]:
         """
         获取文本的嵌入向量
-        
-        使用 LLM API 的嵌入功能（如果支持），否则使用简单的字符级特征
+
+        使用独立的嵌入模型 API（如果配置了 EMBED_API_KEY），
+        否则回退到 LLM_API_KEY，如果都不可用则使用简单的字符级特征
         """
         # 检查缓存
         if text in self._cache:
             return self._cache[text]
-        
+
         try:
-            client = self._get_client()
-            # 尝试使用嵌入 API
-            # 使用专门的嵌入模型（ DashScope 的 text-embedding-v1 ）
+            client = self._get_embed_client()
+            # 使用专门的嵌入模型
             embed_model = os.getenv("EMBED_MODEL", "text-embedding-v1")
-            response = await client.client.embeddings.create(
+            response = await client.embeddings.create(
                 model=embed_model,
                 input=text
             )

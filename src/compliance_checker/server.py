@@ -41,13 +41,17 @@ async def run_compliance_check(
     timeout: Optional[int] = None
 ) -> dict:
     """
-    智能合规审查（V2 主接口）
-    
-    特性：
-    - 根据清单声明自动选择和执行检查
-    - 并行执行所有检查任务
-    - 未实现功能自动提示，不阻断流程
-    
+    【高级接口】智能合规审查 - 需要预定义检查清单
+
+    ⚠️ 注意：这是高级接口，需要了解检查清单格式。普通用户请使用 check_with_description 接口。
+
+    使用场景：
+    - 需要精确控制检查流程和参数
+    - 已有预定义的 checklist_id 或 checklist_yaml
+    - 需要指定具体的文档路径列表
+
+    如需简单用法，请使用：check_with_description(project_path, requirements)
+
     Args:
         project_id: 项目唯一标识
         checklist_id: 清单配置ID（从 config/checklists/ 加载）
@@ -57,11 +61,10 @@ async def run_compliance_check(
         max_concurrent: 最大并行检查数，覆盖配置文件
         enable_throttling: 是否启用限流，覆盖配置文件
         timeout: 单个检查超时时间（秒），覆盖配置文件
-    
+
     Returns:
         {
             "success": true/false,
-            "report_path": "/output/xxx.pdf",
             "summary": {
                 "total": 15,
                 "passed": 12,
