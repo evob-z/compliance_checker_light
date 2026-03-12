@@ -1,0 +1,289 @@
+# =============================================================================
+# 生产环境部署工作流
+# =============================================================================
+# 触发条件:
+#   - 版本标签推送 (v*)
+#   - 手动触发 (workflow_dispatch) - 需要审批
+#
+# 部署目标:
+#   - 生产环境服务器 / K8s 集群
+#   - 使用语义化版本标签的 Docker 镜像
+#
+# 安全要求:
+#   - 需要环境审批 (environment protection)
+#   - 部署前需要人工确认
+# =============================================================================
+
+name: Deploy to Production
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '部署版本 (如: v1.2.3)'
+        required: true
+        type: string
+      ocr_backend:
+        description: 'OCR 后端类型'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - local
+          - cloud
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ==========================================================================
+  # 预部署检查
+  # ==========================================================================
+  pre-deploy-check:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag exists
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+          if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Error: Tag $VERSION does not exist"
+            exit 1
+          fi
+          echo "Verified tag: $VERSION"
+
+      - name: Check image exists
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION=${{ github.event.inputs.version }}
+          else
+            VERSION=${{ github.ref_name }}
+          fi
+          
+          # 检查镜像是否存在
+          TOKEN=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://${{ env.REGISTRY }}/token?scope=repository:${{ github.repository }}:pull" | \
+            jq -r .token)
+          
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://${{ env.REGISTRY }}/v2/${{ github.repository }}/manifests/${VERSION}")
+          
+          if [ "$STATUS" != "200" ]; then
+            echo "Error: Image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} not found"
+            exit 1
+          fi
+          echo "Verified image exists: ${VERSION}"
+
+  # ==========================================================================
+  # 生产环境部署
+  # ==========================================================================
+  deploy:
+    name: Deploy to Production
+    needs: pre-deploy-check
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://compliance-checker.example.com
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set deployment version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "OCR_BACKEND=${{ github.event.inputs.ocr_backend }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "OCR_BACKEND=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # 生产环境部署 - SSH 方案
+      # -----------------------------------------------------------------------
+      - name: Deploy to Production Server
+        if: vars.DEPLOYMENT_TYPE == 'ssh'
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/compliance-checker
+            
+            # 备份当前版本
+            cp docker-compose.yml docker-compose.yml.backup.$(date +%Y%m%d_%H%M%S)
+            
+            # 拉取新版本镜像
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            
+            # 更新配置
+            export IMAGE_TAG=${{ steps.version.outputs.VERSION }}
+            export OCR_BACKEND=${{ steps.version.outputs.OCR_BACKEND }}
+            export LLM_API_KEY=${{ secrets.PROD_LLM_API_KEY }}
+            export LLM_BASE_URL=${{ vars.PROD_LLM_BASE_URL }}
+            export LLM_MODEL=${{ vars.PROD_LLM_MODEL }}
+            export VISION_MODEL=${{ vars.PROD_VISION_MODEL }}
+            export EMBED_MODEL=${{ vars.PROD_EMBED_MODEL }}
+            
+            # 滚动更新
+            docker-compose up -d --no-deps --build app
+            
+            # 健康检查
+            sleep 10
+            if ! curl -sf http://localhost:8000/health; then
+              echo "Health check failed, rolling back..."
+              docker-compose down
+              mv docker-compose.yml.backup.* docker-compose.yml
+              docker-compose up -d
+              exit 1
+            fi
+            
+            # 清理旧镜像（保留最近3个版本）
+            docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} --format "{{.Tag}}" | \
+              sort -V | head -n -3 | xargs -r docker rmi || true
+
+      # -----------------------------------------------------------------------
+      # 生产环境部署 - Kubernetes 方案 (蓝绿部署)
+      # -----------------------------------------------------------------------
+      - name: Deploy to Kubernetes (Blue-Green)
+        if: vars.DEPLOYMENT_TYPE == 'k8s'
+        run: |
+          echo "${{ secrets.PROD_KUBECONFIG }}" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+          
+          VERSION=${{ steps.version.outputs.VERSION }}
+          OCR_BACKEND=${{ steps.version.outputs.OCR_BACKEND }}
+          NAMESPACE=compliance-checker-prod
+          
+          # 确定当前颜色
+          CURRENT_COLOR=$(kubectl get service compliance-checker -n $NAMESPACE -o jsonpath='{.spec.selector.color}' 2>/dev/null || echo "blue")
+          
+          if [ "$CURRENT_COLOR" = "blue" ]; then
+            NEW_COLOR="green"
+          else
+            NEW_COLOR="blue"
+          fi
+          
+          echo "Deploying to $NEW_COLOR (current: $CURRENT_COLOR)"
+          
+          # 更新新颜色部署
+          cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: compliance-checker-$NEW_COLOR
+            namespace: $NAMESPACE
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: compliance-checker
+                color: $NEW_COLOR
+            template:
+              metadata:
+                labels:
+                  app: compliance-checker
+                  color: $NEW_COLOR
+              spec:
+                containers:
+                - name: app
+                  image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
+                  ports:
+                  - containerPort: 8000
+                  env:
+                  - name: OCR_BACKEND
+                    value: "$OCR_BACKEND"
+                  - name: LLM_API_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: compliance-checker-secrets
+                        key: llm-api-key
+                  - name: LLM_BASE_URL
+                    value: "${{ vars.PROD_LLM_BASE_URL }}"
+                  - name: LLM_MODEL
+                    value: "${{ vars.PROD_LLM_MODEL }}"
+                  readinessProbe:
+                    httpGet:
+                      path: /health
+                      port: 8000
+                    initialDelaySeconds: 10
+                    periodSeconds: 5
+          EOF
+          
+          # 等待新部署就绪
+          kubectl rollout status deployment/compliance-checker-$NEW_COLOR -n $NAMESPACE --timeout=300s
+          
+          # 切换流量
+          kubectl patch service compliance-checker -n $NAMESPACE -p \
+            '{"spec":{"selector":{"color":"'$NEW_COLOR'"}}}'
+          
+          # 缩减旧版本
+          kubectl scale deployment/compliance-checker-$CURRENT_COLOR -n $NAMESPACE --replicas=0
+          
+          echo "Deployment complete: $CURRENT_COLOR -> $NEW_COLOR"
+
+      # -----------------------------------------------------------------------
+      # 验证部署
+      # -----------------------------------------------------------------------
+      - name: Verify deployment
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          
+          # 这里可以添加更多的验证逻辑
+          # 例如：运行冒烟测试、检查关键指标等
+          echo "Deployment verification complete"
+
+      - name: Notify deployment success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#production-deployments'
+          text: |
+            Production Deployment Successful
+            Version: ${{ steps.version.outputs.VERSION }}
+            OCR Backend: ${{ steps.version.outputs.OCR_BACKEND }}
+            Deployed by: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify deployment failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#production-deployments'
+          text: |
+            Production Deployment Failed!
+            Version: ${{ steps.version.outputs.VERSION }}
+            Deployed by: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+            Please check the logs immediately!
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

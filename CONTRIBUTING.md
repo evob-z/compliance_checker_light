@@ -31,7 +31,7 @@
 
 1. **Fork 并克隆仓库**
    ```bash
-   git clone https://github.com/your-username/compliance_checker_light.git
+   git clone https://github.com/evob-z/compliance_checker_light.git
    cd compliance_checker_light
    ```
 
@@ -72,7 +72,7 @@
 **基础开发环境：**
 ```bash
 # 克隆仓库
-git clone https://github.com/your-username/compliance_checker_light.git
+git clone https://github.com/evob-z/compliance_checker_light.git
 cd compliance_checker_light
 
 # 创建虚拟环境
@@ -413,7 +413,7 @@ VISION_MODEL=qwen3-vl-flash
 
 ## 获取帮助
 
-- 提交 Issue：[GitHub Issues](https://github.com/your-repo/issues)
+- 提交 Issue：[GitHub Issues](https://github.com/evob-z/compliance_checker_light/issues)
 - 阅读文档：[README.md](README.md)
 
 感谢您的贡献！
