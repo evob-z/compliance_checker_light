@@ -591,19 +591,19 @@ class ComplianceChecker:
                         check_item = None  # 已添加，避免重复
                 else:
                     # 视觉检查未启用或不可用，标记需要视觉检查
-                    if not check_item or not check_item.found:
-                        if check_item:
-                            check_item.message += " [建议启用视觉检查确认]"
-                            if check_item.status == CheckStatus.PASS:
-                                check_item.status = CheckStatus.UNCLEAR
-                        else:
-                            check_item = ComplianceCheckItem(
-                                point=point.point,
-                                found=False,
-                                status=CheckStatus.UNCLEAR,
-                                message="建议启用视觉检查确认" + (" (QWEN_API_KEY未配置)" if not self.visual_checker.is_available() else ""),
-                                pattern=point.pattern
-                            )
+                    # 无论文本检查是否通过，都需要视觉确认，标记为 UNCLEAR
+                    if check_item:
+                        check_item.message += " [建议启用视觉检查确认]"
+                        if check_item.status == CheckStatus.PASS:
+                            check_item.status = CheckStatus.UNCLEAR
+                    else:
+                        check_item = ComplianceCheckItem(
+                            point=point.point,
+                            found=False,
+                            status=CheckStatus.UNCLEAR,
+                            message="建议启用视觉检查确认" + (" (QWEN_API_KEY未配置)" if not self.visual_checker.is_available() else ""),
+                            pattern=point.pattern
+                        )
             
             if check_item:
                 checks.append(check_item)
