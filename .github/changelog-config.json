@@ -1,0 +1,78 @@
+{
+  "categories": [
+    {
+      "title": "## 🚀 Features",
+      "labels": ["feat", "feature"]
+    },
+    {
+      "title": "## 🐛 Bug Fixes",
+      "labels": ["fix", "bugfix", "bug"]
+    },
+    {
+      "title": "## 📝 Documentation",
+      "labels": ["docs", "documentation"]
+    },
+    {
+      "title": "## 🔧 Maintenance",
+      "labels": ["chore", "refactor", "style", "test"]
+    },
+    {
+      "title": "## 🔒 Security",
+      "labels": ["security"]
+    },
+    {
+      "title": "## 📦 Dependencies",
+      "labels": ["deps", "dependencies"]
+    }
+  ],
+  "sort": "ASC",
+  "template": "${{CHANGELOG}}\n\n## 📊 Stats\n\n**Full Changelog**: ${{RELEASE_DIFF}}",
+  "pr_template": "- ${{TITLE}} (#${{NUMBER}})",
+  "empty_template": "- No changes",
+  "label_extractor": [
+    {
+      "pattern": "^(feat|feature):",
+      "target": "$1",
+      "flags": "i"
+    },
+    {
+      "pattern": "^(fix|bugfix|bug):",
+      "target": "$1",
+      "flags": "i"
+    },
+    {
+      "pattern": "^(docs|documentation):",
+      "target": "$1",
+      "flags": "i"
+    },
+    {
+      "pattern": "^(chore|refactor|style|test):",
+      "target": "$1",
+      "flags": "i"
+    },
+    {
+      "pattern": "^(security):",
+      "target": "$1",
+      "flags": "i"
+    },
+    {
+      "pattern": "^(deps|dependencies):",
+      "target": "$1",
+      "flags": "i"
+    }
+  ],
+  "duplicate_filter": {
+    "pattern": "\\[ABC-\\d+\\]",
+    "on_property": "title",
+    "method": "match"
+  },
+  "transformers": [
+    {
+      "pattern": "[\\-\\*] (\\[(...|TEST|CI|SKIP)\\])( )?",
+      "target": "- $1"
+    }
+  ],
+  "max_tags_to_fetch": 200,
+  "max_pull_requests": 200,
+  "max_back_track_time_days": 365
+}

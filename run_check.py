@@ -15,7 +15,7 @@ from compliance_checker.skill import ComplianceSkill
 async def main():
     skill = ComplianceSkill()
     result = await skill.check(
-        project_path='d:/AI_model/compliance-checker/archive/docs',
+        project_path='/test',
         requirements='检查是否有发票文件，验证签发日期是否在2026年3月10日前，检查是否有印章',
         project_period={'start': '2026-01', 'end': '2026-12'}
     )

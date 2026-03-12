@@ -1,0 +1,124 @@
+# =============================================================================
+# 开发环境部署工作流
+# =============================================================================
+# 触发条件:
+#   - develop 分支推送
+#   - 手动触发 (workflow_dispatch)
+#
+# 部署目标:
+#   - 开发环境服务器 / K8s 集群
+#   - 使用 latest 标签的 Docker 镜像
+# =============================================================================
+
+name: Deploy to Development
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: https://dev-compliance-checker.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # 方案 A: 直接部署到服务器 (使用 SSH)
+      # -----------------------------------------------------------------------
+      - name: Deploy to Development Server (SSH)
+        if: vars.DEPLOYMENT_TYPE == 'ssh'
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script: |
+            cd /opt/compliance-checker
+            
+            # 拉取最新镜像
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+            
+            # 更新 docker-compose
+            export IMAGE_TAG=develop
+            export OCR_BACKEND=none
+            export LLM_API_KEY=${{ secrets.DEV_LLM_API_KEY }}
+            export LLM_BASE_URL=${{ vars.DEV_LLM_BASE_URL }}
+            export LLM_MODEL=${{ vars.DEV_LLM_MODEL }}
+            
+            docker-compose down
+            docker-compose up -d
+            
+            # 清理旧镜像
+            docker image prune -f
+
+      # -----------------------------------------------------------------------
+      # 方案 B: 部署到 Kubernetes
+      # -----------------------------------------------------------------------
+      - name: Deploy to Kubernetes (K8s)
+        if: vars.DEPLOYMENT_TYPE == 'k8s'
+        run: |
+          # 配置 kubectl
+          echo "${{ secrets.DEV_KUBECONFIG }}" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+          
+          # 更新镜像标签
+          kubectl set image deployment/compliance-checker \
+            app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop \
+            -n compliance-checker-dev
+          
+          # 等待部署完成
+          kubectl rollout status deployment/compliance-checker \
+            -n compliance-checker-dev --timeout=300s
+
+      # -----------------------------------------------------------------------
+      # 方案 C: 部署到 Docker Swarm
+      # -----------------------------------------------------------------------
+      - name: Deploy to Docker Swarm
+        if: vars.DEPLOYMENT_TYPE == 'swarm'
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script: |
+            docker service update \
+              --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop \
+              compliance-checker_dev
+
+      - name: Notify deployment status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: |
+            Development Deployment: ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
