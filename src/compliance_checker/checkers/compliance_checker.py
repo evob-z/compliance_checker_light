@@ -67,9 +67,9 @@ class ComplianceChecker(BaseChecker):
             result = await legacy_checker.check(documents, checklist)
 
             # 转换结果为新的格式
-            if result.status.value in ("PASS", "VALID"):
+            if result.status.value in ("pass", "valid"):
                 status = CheckStatus.PASS
-            elif result.status.value in ("FAIL", "HAS_ISSUES", "MISSING"):
+            elif result.status.value in ("fail", "has_issues", "missing"):
                 status = CheckStatus.FAIL
             else:
                 status = CheckStatus.FAIL

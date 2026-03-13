@@ -71,9 +71,9 @@ class CompletenessChecker(BaseChecker):
 
             # 转换结果为新的格式
             # 将 Legacy CheckStatus 转换为新的 CheckStatus
-            if result.status.value in ("PASS", "VALID"):
+            if result.status.value in ("pass", "valid"):
                 status = CheckStatus.PASS
-            elif result.status.value == "FAIL":
+            elif result.status.value == "fail":
                 status = CheckStatus.FAIL
             else:
                 status = CheckStatus.FAIL

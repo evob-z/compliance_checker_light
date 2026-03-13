@@ -108,7 +108,6 @@ class TimelinessChecker(BaseChecker):
             ):
                 # 逐个文档检查，传入validity_rule
                 from ..tools.timeliness import TimelinessDetail, TimelinessResult
-                from ..core.result_model import CheckStatus as ResultCheckStatus
 
                 details = []
                 valid_count = 0
@@ -119,20 +118,20 @@ class TimelinessChecker(BaseChecker):
                     detail = legacy_checker.check_document(doc, validity_rule)
                     details.append(detail)
 
-                    if detail.status == ResultCheckStatus.VALID:
+                    if detail.status == CheckStatus.VALID:
                         valid_count += 1
-                    elif detail.status in (ResultCheckStatus.EXPIRED, ResultCheckStatus.FAIL):
+                    elif detail.status in (CheckStatus.EXPIRED, CheckStatus.FAIL):
                         expired_count += 1
                     else:
                         unclear_count += 1
 
                 # 确定整体状态
                 if expired_count > 0:
-                    status = ResultCheckStatus.HAS_ISSUES
+                    status = CheckStatus.HAS_ISSUES
                 elif unclear_count > 0:
-                    status = ResultCheckStatus.HAS_ISSUES
+                    status = CheckStatus.HAS_ISSUES
                 else:
-                    status = ResultCheckStatus.PASS
+                    status = CheckStatus.PASS
 
                 result = TimelinessResult(
                     status=status,
@@ -147,9 +146,9 @@ class TimelinessChecker(BaseChecker):
                 result = legacy_checker.check(documents, checklist)
 
             # 转换结果为新的格式
-            if result.status.value in ("PASS", "VALID"):
+            if result.status.value in ("pass", "valid"):
                 status = CheckStatus.PASS
-            elif result.status.value == "EXPIRED":
+            elif result.status.value == "expired":
                 status = CheckStatus.FAIL
             else:
                 status = CheckStatus.FAIL
