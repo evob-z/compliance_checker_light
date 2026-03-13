@@ -70,3 +70,45 @@ where = ["src"]
 [tool.black]
 line-length = 100
 target-version = ['py310']
+
+[tool.coverage.run]
+source = ["src/compliance_checker"]
+omit = [
+    # 初始化文件
+    "*/__init__.py",
+    # 配置文件
+    "*/config/*.py",
+    "*/config/settings.py",
+    # 异常定义
+    "*/core/exceptions.py",
+    # YAML 兼容层（简单适配代码）
+    "*/core/yaml_compat.py",
+    # 主入口和服务器（集成测试覆盖）
+    "*/server.py",
+    "*/skill.py",
+    "*/skill_formatter.py",
+    # 验证器（配置校验）
+    "*/validators/*.py",
+    # 报告生成（模板渲染）
+    "*/report/*.py",
+    # 提示词模板（静态文本）
+    "*/prompts/*.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "pass",
+    "^\\s*\\.\\.\\.$",  # 省略号
+]
+show_missing = true
+skip_covered = false
+
+[tool.coverage.html]
+directory = "htmlcov"
+skip_covered = false
