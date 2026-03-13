@@ -8,13 +8,13 @@ from .visual import visual_inspection
 from .report import generate_report
 
 __all__ = [
-    'parse_documents',
-    'get_document_info',
-    'load_checklist',
-    'list_available_checklists',
-    'check_completeness',
-    'check_timeliness',
-    'check_compliance',
-    'visual_inspection',
-    'generate_report',
+    "parse_documents",
+    "get_document_info",
+    "load_checklist",
+    "list_available_checklists",
+    "check_completeness",
+    "check_timeliness",
+    "check_compliance",
+    "visual_inspection",
+    "generate_report",
 ]

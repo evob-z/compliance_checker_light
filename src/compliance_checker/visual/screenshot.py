@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import fitz  # PyMuPDF
+
     HAS_FITZ = True
 except ImportError:
     HAS_FITZ = False
@@ -20,42 +21,42 @@ def capture_page(
     page_num: int = 0,
     dpi: int = 150,
     output_path: Optional[str] = None,
-    bbox: Optional[Tuple[int, int, int, int]] = None
+    bbox: Optional[Tuple[int, int, int, int]] = None,
 ) -> str:
     """
     截取 PDF 页面为图片
-    
+
     Args:
         pdf_path: PDF 文件路径
         page_num: 页码（从0开始）
         dpi: 分辨率
         output_path: 输出路径（默认临时文件）
         bbox: 裁剪区域 (x1, y1, x2, y2)，None 表示整页
-        
+
     Returns:
         截图文件路径
     """
     if not HAS_FITZ:
         raise RuntimeError("PyMuPDF required for screenshot capture")
-    
+
     doc = fitz.open(pdf_path)
-    
+
     try:
         if page_num >= len(doc):
             raise ValueError(f"Page {page_num} not found, document has {len(doc)} pages")
-        
+
         page = doc[page_num]
-        
+
         # 设置缩放矩阵
-        mat = fitz.Matrix(dpi/72, dpi/72)
-        
+        mat = fitz.Matrix(dpi / 72, dpi / 72)
+
         # 如果有 bbox，裁剪；否则整页
         if bbox:
             rect = fitz.Rect(bbox)
             pix = page.get_pixmap(matrix=mat, clip=rect)
         else:
             pix = page.get_pixmap(matrix=mat)
-        
+
         # 确定输出路径
         if output_path is None:
             suffix = f"_page{page_num}.png"
@@ -63,33 +64,29 @@ def capture_page(
             Path(output_path).write_bytes(pix.tobytes("png"))
         else:
             pix.save(output_path)
-        
+
         return output_path
-        
+
     finally:
         doc.close()
 
 
-def capture_full_page_base64(
-    pdf_path: str,
-    page_num: int = 0,
-    dpi: int = 150
-) -> str:
+def capture_full_page_base64(pdf_path: str, page_num: int = 0, dpi: int = 150) -> str:
     """
     截取整页并转为 base64
-    
+
     Args:
         pdf_path: PDF 文件路径
         page_num: 页码（从0开始）
         dpi: 分辨率
-        
+
     Returns:
         base64 编码的 PNG 图片
     """
     import base64
-    
+
     output_path = capture_page(pdf_path, page_num, dpi)
-    
+
     try:
         with open(output_path, "rb") as f:
             image_bytes = f.read()
@@ -103,24 +100,24 @@ def capture_region_base64(
     pdf_path: str,
     page_num: int = 0,
     bbox: Optional[Tuple[int, int, int, int]] = None,
-    dpi: int = 150
+    dpi: int = 150,
 ) -> str:
     """
     截取 PDF 指定区域并转为 base64
-    
+
     Args:
         pdf_path: PDF 文件路径
         page_num: 页码（从0开始）
         bbox: 裁剪区域 (x1, y1, x2, y2)，None 表示整页
         dpi: 分辨率
-        
+
     Returns:
         base64 编码的 PNG 图片
     """
     import base64
-    
+
     output_path = capture_page(pdf_path, page_num, dpi, bbox=bbox)
-    
+
     try:
         with open(output_path, "rb") as f:
             image_bytes = f.read()
@@ -133,13 +130,13 @@ def capture_region_base64(
 def get_page_size(pdf_path: str, page_num: int = 0) -> Tuple[int, int]:
     """
     获取页面尺寸
-    
+
     Returns:
         (width, height) in points
     """
     if not HAS_FITZ:
         raise RuntimeError("PyMuPDF required")
-    
+
     doc = fitz.open(pdf_path)
     try:
         page = doc[page_num]
@@ -153,7 +150,7 @@ def get_page_count(pdf_path: str) -> int:
     """获取 PDF 总页数"""
     if not HAS_FITZ:
         raise RuntimeError("PyMuPDF required")
-    
+
     doc = fitz.open(pdf_path)
     try:
         return len(doc)

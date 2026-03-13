@@ -11,9 +11,12 @@
 __version__ = "0.1.0"
 __author__ = "evob + claw"
 
+
 # 延迟导入 server，避免在导入 __init__ 时就加载 fastmcp
 def get_mcp():
     from .server import mcp
+
     return mcp
+
 
 __all__ = ["get_mcp"]

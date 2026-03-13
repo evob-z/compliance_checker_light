@@ -95,16 +95,14 @@ checklist:
 def generate_checklist_prompt(user_description: str) -> str:
     """
     生成清单转换 Prompt
-    
+
     Args:
         user_description: 用户的自然语言描述
-    
+
     Returns:
         完整的 Prompt 字符串
     """
-    return CHECKLIST_GENERATION_PROMPT.format(
-        user_description=user_description
-    )
+    return CHECKLIST_GENERATION_PROMPT.format(user_description=user_description)
 
 
 # 可选：提供少样本示例
@@ -160,7 +158,7 @@ checklist:
         - type: "compliance"
           required: true
           points: ["公章", "编号"]
-"""
+""",
     }
 ]
 
@@ -168,51 +166,50 @@ checklist:
 def generate_checklist_prompt_with_examples(user_description: str, num_examples: int = 1) -> str:
     """
     生成带示例的清单转换 Prompt
-    
+
     Args:
         user_description: 用户的自然语言描述
         num_examples: 示例数量
-    
+
     Returns:
         完整的 Prompt 字符串（包含示例）
     """
     prompt = CHECKLIST_GENERATION_PROMPT.format(user_description=user_description)
-    
+
     if num_examples > 0:
         prompt += "\n\n## 示例\n\n"
         for i, example in enumerate(CHECKLIST_EXAMPLES[:num_examples]):
             prompt += f"### 示例 {i+1}\n\n"
             prompt += f"输入: {example['input']}\n\n"
             prompt += f"输出:\n{example['output']}\n\n"
-    
+
     return prompt
 
 
 # ==================== 异步生成功能 ====================
 
+
 async def async_generate_checklist_from_description(
-    user_description: str,
-    use_examples: bool = False,
-    num_examples: int = 1
+    user_description: str, use_examples: bool = False, num_examples: int = 1
 ) -> dict:
     """
     异步从自然语言描述生成清单
-    
+
     此函数使用 LLM 客户端将自然语言转换为 YAML 清单
-    
+
     Args:
         user_description: 用户的自然语言描述
         use_examples: 是否使用少样本示例
         num_examples: 示例数量（仅在 use_examples=True 时有效）
-    
+
     Returns:
         解析后的清单字典，包含 'checklist' 键
-    
+
     Raises:
         ImportError: 未安装 openai
         ValueError: LLM 配置缺失或 YAML 解析失败
         Exception: LLM API 调用失败
-    
+
     Example:
         >>> checklist = await async_generate_checklist_from_description(
         ...     "审查建设工程项目，需要立项批复、环评批复"
@@ -220,20 +217,22 @@ async def async_generate_checklist_from_description(
         >>> print(checklist['checklist']['name'])
     """
     from ..llm.client import generate_checklist_from_description
-    
+
     # 如果需要使用示例，先生成带示例的 prompt
     if use_examples:
         prompt = generate_checklist_prompt_with_examples(user_description, num_examples)
-        
+
         # 临时使用 LLM 客户端，但传入自定义 prompt
         from ..llm.client import LLMClient
+
         client = LLMClient()
-        
+
         content = await client.complete(prompt)
-        
+
         # 清理和解析 YAML
         content = client._clean_yaml_content(content)
         import yaml
+
         try:
             data = yaml.safe_load(content)
             if not isinstance(data, dict) or "checklist" not in data:
@@ -247,23 +246,22 @@ async def async_generate_checklist_from_description(
 
 
 async def async_generate_checklist_with_period(
-    user_description: str,
-    project_period: Optional[dict] = None
+    user_description: str, project_period: Optional[dict] = None
 ) -> dict:
     """
     异步生成清单，并可选地注入项目周期
-    
+
     Args:
         user_description: 用户的自然语言描述
         project_period: 项目周期，格式 {"start": "YYYY-MM", "end": "YYYY-MM"}
-    
+
     Returns:
         解析后的清单字典
     """
     checklist = await async_generate_checklist_from_description(user_description)
-    
+
     # 如果提供了项目周期，注入到清单中
     if project_period and "checklist" in checklist:
         checklist["checklist"]["project_period"] = project_period
-    
+
     return checklist

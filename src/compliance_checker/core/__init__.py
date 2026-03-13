@@ -13,7 +13,7 @@ from .checklist_model import (
     ProjectPeriod,
     CheckMethod,
     DocumentType,
-    ChecklistSummary
+    ChecklistSummary,
 )
 from .result_model import (
     CheckResult as LegacyCheckResult,
@@ -27,30 +27,21 @@ from .result_model import (
     DocumentCompliance,
     ComplianceCheckItem,
     DocumentMatch,
-    MatchType
+    MatchType,
 )
-from .checker_base import (
-    CheckStatus,
-    CheckResult,
-    BaseChecker,
-    UnavailableChecker
-)
-from .checker_registry import (
-    CheckerRegistry,
-    get_initialized_registry
-)
+from .checker_base import CheckStatus, CheckResult, BaseChecker, UnavailableChecker
+from .checker_registry import CheckerRegistry, get_initialized_registry
 from .exceptions import (
     ComplianceCheckerError,
     ChecklistError,
     DocumentParseError,
-    CheckExecutionError
+    CheckExecutionError,
 )
 
 __all__ = [
     # 文档模型
     "Document",
     "PageContent",
-    
     # 清单模型
     "Checklist",
     "RequiredDocument",
@@ -60,11 +51,9 @@ __all__ = [
     "CheckMethod",
     "DocumentType",
     "ChecklistSummary",
-    
     # 检查结果模型 (新版)
     "CheckStatus",
     "CheckResult",
-    
     # 检查结果模型 (旧版兼容)
     "LegacyCheckStatus",
     "LegacyCheckResult",
@@ -78,18 +67,15 @@ __all__ = [
     "ComplianceCheckItem",
     "DocumentMatch",
     "MatchType",
-    
     # 检查器基类
     "BaseChecker",
     "UnavailableChecker",
-    
     # 注册表
     "CheckerRegistry",
     "get_initialized_registry",
-    
     # 异常
     "ComplianceCheckerError",
     "ChecklistError",
     "DocumentParseError",
-    "CheckExecutionError"
+    "CheckExecutionError",
 ]

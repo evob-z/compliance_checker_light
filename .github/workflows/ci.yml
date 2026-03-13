@@ -70,6 +70,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -e ".[dev]"
+          pip install pytest-cov
 
       - name: Run tests
         run: pytest tests/ -v --cov=compliance_checker --cov-report=xml
@@ -99,4 +100,4 @@ jobs:
         run: pip install safety
 
       - name: Check dependencies
-        run: safety scan --full-report
+        run: safety check --full-report

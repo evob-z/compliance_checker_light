@@ -114,11 +114,12 @@ class PaddleOCREngine(BaseOCREngine):
             try:
                 with _suppress_output():
                     from paddleocr import PaddleOCR
+
                     self._ocr = PaddleOCR(
                         use_angle_cls=True,
                         lang=self.lang,
                         use_gpu=self.use_gpu,
-                        show_log=self.show_log
+                        show_log=self.show_log,
                     )
                 logger.info("PaddleOCR 引擎初始化成功")
             except ImportError:
@@ -237,9 +238,7 @@ class AliyunOCREngine(BaseOCREngine):
                 logger.info("阿里云 OCR 客户端初始化成功")
 
             except ImportError:
-                logger.error(
-                    "阿里云 OCR SDK 未安装，请运行: pip install 'compliance-checker[cloud-ocr]'"
-                )
+                logger.error("阿里云 OCR SDK 未安装，请运行: pip install 'compliance-checker[cloud-ocr]'")
                 raise
             except Exception as e:
                 logger.error(f"阿里云 OCR 初始化失败: {e}")
@@ -257,6 +256,7 @@ class AliyunOCREngine(BaseOCREngine):
                 image_bytes = f.read()
 
             import base64
+
             image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
             body = ocr_models.RecognizeGeneralTextRequestBody(

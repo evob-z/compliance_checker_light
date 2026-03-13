@@ -9,9 +9,4 @@ from .timeliness_checker import TimelinessChecker
 from .compliance_checker import ComplianceChecker
 from .visual_checker import VisualChecker
 
-__all__ = [
-    "CompletenessChecker",
-    "TimelinessChecker",
-    "ComplianceChecker",
-    "VisualChecker"
-]
+__all__ = ["CompletenessChecker", "TimelinessChecker", "ComplianceChecker", "VisualChecker"]
