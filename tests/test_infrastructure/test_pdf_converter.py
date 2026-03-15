@@ -106,7 +106,7 @@ class TestPyMuPDFConverter:
         assert len(images[0]) > 0
 
         # 验证是有效的 PNG（以 PNG 魔数开头）
-        assert images[0].startswith(b'\x89PNG')
+        assert images[0].startswith(b"\x89PNG")
 
     @pytest.mark.asyncio
     async def test_convert_multi_page_pdf_from_bytes(self, converter):
@@ -124,7 +124,7 @@ class TestPyMuPDFConverter:
         assert len(images) == num_pages
         for img in images:
             assert isinstance(img, bytes)
-            assert img.startswith(b'\x89PNG')
+            assert img.startswith(b"\x89PNG")
 
     @pytest.mark.asyncio
     async def test_convert_pdf_with_different_zoom_factors(self):
@@ -191,10 +191,7 @@ class TestPyMuPDFConverter:
 
         assert "PDF 转换失败" in str(exc_info.value)
 
-    @pytest.mark.skipif(
-        True,  # 默认跳过，需要真实 PDF 文件
-        reason="需要真实 PDF 文件"
-    )
+    @pytest.mark.skipif(True, reason="需要真实 PDF 文件")  # 默认跳过，需要真实 PDF 文件
     @pytest.mark.asyncio
     async def test_convert_pdf_from_file_path(self, converter, tmp_path):
         """
@@ -211,7 +208,7 @@ class TestPyMuPDFConverter:
         images = await converter.convert_to_images(str(pdf_file))
 
         assert len(images) == 1
-        assert images[0].startswith(b'\x89PNG')
+        assert images[0].startswith(b"\x89PNG")
 
 
 class TestPyMuPDFConverterSyncMethods:
@@ -245,7 +242,7 @@ class TestPyMuPDFConverterSyncMethods:
 
         assert isinstance(images, list)
         assert len(images) == 1
-        assert images[0].startswith(b'\x89PNG')
+        assert images[0].startswith(b"\x89PNG")
 
     def test_convert_to_images_sync(self):
         """
@@ -261,7 +258,7 @@ class TestPyMuPDFConverterSyncMethods:
 
         assert isinstance(images, list)
         assert len(images) == 1
-        assert images[0].startswith(b'\x89PNG')
+        assert images[0].startswith(b"\x89PNG")
 
 
 class TestPyMuPDFConverterEdgeCases:
@@ -320,4 +317,4 @@ class TestPyMuPDFConverterEdgeCases:
 
         assert len(images) == 10
         for img in images:
-            assert img.startswith(b'\x89PNG')
+            assert img.startswith(b"\x89PNG")

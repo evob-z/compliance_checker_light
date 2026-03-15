@@ -233,7 +233,9 @@ class AliyunOCREngine(OCREngineProtocol):
     特点: 轻量，需网络，按量付费
     """
 
-    def __init__(self, access_key_id: Optional[str] = None, access_key_secret: Optional[str] = None):
+    def __init__(
+        self, access_key_id: Optional[str] = None, access_key_secret: Optional[str] = None
+    ):
         """
         初始化阿里云 OCR 引擎
 
@@ -267,7 +269,9 @@ class AliyunOCREngine(OCREngineProtocol):
                 logger.info("阿里云 OCR 客户端初始化成功")
 
             except ImportError:
-                logger.error("阿里云 OCR SDK 未安装，请运行: pip install alibabacloud_ocr_api20210707")
+                logger.error(
+                    "阿里云 OCR SDK 未安装，请运行: pip install alibabacloud_ocr_api20210707"
+                )
                 raise
             except Exception as e:
                 logger.error(f"阿里云 OCR 初始化失败: {e}")
@@ -294,6 +298,7 @@ class AliyunOCREngine(OCREngineProtocol):
                 image_bytes = f.read()
 
             import base64
+
             image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
             body = ocr_models.RecognizeGeneralTextRequestBody(

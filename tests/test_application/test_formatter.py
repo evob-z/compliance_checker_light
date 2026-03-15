@@ -28,6 +28,7 @@ from src.domain.engine.declarative import ExecutionResult, CheckTask
 
 class MockExecutionResult:
     """Mock 执行结果对象，用于测试"""
+
     def __init__(
         self,
         success: bool = True,
@@ -38,7 +39,13 @@ class MockExecutionResult:
         execution_time: float = 1.5,
     ):
         self.success = success
-        self.summary = summary or {"total": 5, "passed": 5, "failed": 0, "errors": 0, "unavailable": 0}
+        self.summary = summary or {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "errors": 0,
+            "unavailable": 0,
+        }
         self.document_results = document_results or {}
         self.messages = messages or []
         self.unavailable_features = unavailable_features or []
@@ -96,7 +103,7 @@ class TestFormatSingleResult:
     def test_format_pass_result(self, sample_check_result_pass):
         """测试格式化通过结果"""
         lines = _format_single_result(sample_check_result_pass)
-        
+
         # 验证包含状态图标
         assert any("✅" in line for line in lines)
         # 验证包含检查类型
@@ -107,7 +114,7 @@ class TestFormatSingleResult:
     def test_format_fail_result(self, sample_check_result_fail):
         """测试格式化失败结果"""
         lines = _format_single_result(sample_check_result_fail)
-        
+
         # 验证包含状态图标
         assert any("❌" in line for line in lines)
         # 验证包含检查类型
@@ -118,14 +125,14 @@ class TestFormatSingleResult:
     def test_format_error_result(self, sample_check_result_error):
         """测试格式化错误结果"""
         lines = _format_single_result(sample_check_result_error)
-        
+
         # 验证包含错误图标
         assert any("💥" in line for line in lines)
 
     def test_format_unavailable_result(self, sample_check_result_unavailable):
         """测试格式化不可用结果"""
         lines = _format_single_result(sample_check_result_unavailable)
-        
+
         # 验证包含警告图标
         assert any("⚠️" in line for line in lines)
 
@@ -142,7 +149,7 @@ class TestFormatSingleResult:
             },
         )
         lines = _format_single_result(result)
-        
+
         # 验证详细信息被格式化（document 字段应被跳过）
         assert any("key1" in line for line in lines)
         assert any("key2" in line for line in lines)
@@ -158,9 +165,9 @@ class TestFormatCheckResult:
             success=True,
             summary={"total": 3, "passed": 3, "failed": 0, "errors": 0, "unavailable": 0},
         )
-        
+
         text = format_check_result(result)
-        
+
         # 验证包含标题
         assert "合规审查结果" in text
         # 验证包含统计信息
@@ -184,9 +191,9 @@ class TestFormatCheckResult:
                 ],
             },
         )
-        
+
         text = format_check_result(result)
-        
+
         # 验证包含统计信息
         assert "失败: 2 项" in text
         assert "错误: 1 项" in text
@@ -199,9 +206,9 @@ class TestFormatCheckResult:
             success=True,
             summary={"total": 5, "passed": 4, "failed": 0, "errors": 0, "unavailable": 1},
         )
-        
+
         text = format_check_result(result)
-        
+
         # 验证包含不可用统计
         assert "暂不可用: 1 项" in text
 
@@ -211,9 +218,9 @@ class TestFormatCheckResult:
             success=True,
             messages=["提示信息1", "提示信息2"],
         )
-        
+
         text = format_check_result(result)
-        
+
         # 验证包含提示信息标题
         assert "提示信息" in text
         # 验证包含具体提示
@@ -234,9 +241,9 @@ class TestFormatCheckResult:
                 ],
             },
         )
-        
+
         text = format_check_result(result)
-        
+
         # 验证包含项目级别标题
         assert "项目级别检查" in text
 
@@ -246,9 +253,9 @@ class TestFormatCheckResult:
             success=True,
             execution_time=2.567,
         )
-        
+
         text = format_check_result(result)
-        
+
         # 验证包含执行时间（保留两位小数）
         assert "执行时间: 2.57 秒" in text or "执行时间: 2.56" in text
 
@@ -262,9 +269,9 @@ class TestFormatSimpleResult:
             success=True,
             summary={"total": 5, "passed": 5, "failed": 0, "errors": 0, "unavailable": 0},
         )
-        
+
         formatted = format_simple_result(result)
-        
+
         # 验证必需字段
         assert "success" in formatted
         assert "summary" in formatted
@@ -279,10 +286,10 @@ class TestFormatSimpleResult:
             success=True,
             summary={"total": 10, "passed": 7, "failed": 2, "errors": 1, "unavailable": 0},
         )
-        
+
         formatted = format_simple_result(result)
         summary = formatted["summary"]
-        
+
         # 验证 summary 字段
         assert summary["total_checks"] == 10
         assert summary["passed"] == 7
@@ -319,13 +326,13 @@ class TestFormatSimpleResult:
                 ],
             },
         )
-        
+
         formatted = format_simple_result(result)
-        
+
         # 验证问题数量
         assert formatted["issues_count"] == 2  # 只有 FAIL 和 ERROR 算问题
         assert len(formatted["issues"]) == 2
-        
+
         # 验证问题字段结构
         for issue in formatted["issues"]:
             assert "document" in issue
@@ -348,9 +355,9 @@ class TestFormatSimpleResult:
                 ],
             },
         )
-        
+
         formatted = format_simple_result(result)
-        
+
         # 验证项目级别文档名称被转换
         assert len(formatted["issues"]) == 1
         assert formatted["issues"][0]["document"] == "项目级别"
@@ -369,9 +376,9 @@ class TestFormatSimpleResult:
                 ],
             },
         )
-        
+
         formatted = format_simple_result(result)
-        
+
         # 通过的结果不应在 issues 中
         assert formatted["issues_count"] == 0
         assert formatted["issues"] == []
@@ -384,9 +391,9 @@ class TestFormatSimpleResult:
             messages=["msg1", "msg2"],
             execution_time=1.23,
         )
-        
+
         formatted = format_simple_result(result)
-        
+
         # 验证类型
         assert isinstance(formatted["success"], bool)
         assert isinstance(formatted["summary"], dict)
@@ -402,9 +409,9 @@ class TestFormatIssuesDescription:
     def test_description_all_pass(self):
         """测试全部通过时的描述"""
         result = MockExecutionResult(success=True)
-        
+
         description = format_issues_description(result)
-        
+
         # 验证包含通过提示
         assert "✅" in description
         assert "通过" in description
@@ -424,9 +431,9 @@ class TestFormatIssuesDescription:
                 ],
             },
         )
-        
+
         description = format_issues_description(result)
-        
+
         # 验证包含问题数量
         assert "2" in description or "问题" in description
         # 验证包含文档名称
@@ -461,9 +468,9 @@ class TestFormatIssuesDescription:
                 ],
             },
         )
-        
+
         description = format_issues_description(result)
-        
+
         # 验证检查类型被正确映射为中文
         assert "完整性检查" in description
         assert "时效性检查" in description
@@ -484,9 +491,9 @@ class TestFormatIssuesDescription:
                 ],
             },
         )
-        
+
         description = format_issues_description(result)
-        
+
         # 验证项目级别显示名称
         assert "项目整体" in description
 
@@ -508,9 +515,9 @@ class TestFormatIssuesDescription:
                 ],
             },
         )
-        
+
         description = format_issues_description(result)
-        
+
         # 验证包含问题详情
         assert "问题详情1" in description
         assert "问题详情2" in description
@@ -522,13 +529,13 @@ class TestFormatIssuesDescription:
             success=True,
             unavailable_features=["visual", "authenticity"],
         )
-        
+
         description = format_issues_description(result)
-        
+
         # 验证返回描述（可能是通过描述或包含不可用提示）
         assert isinstance(description, str)
         assert len(description) > 0
-        
+
     def test_description_with_unavailable_and_failures(self):
         """测试包含不可用功能和失败时的描述"""
         result = MockExecutionResult(
@@ -545,27 +552,27 @@ class TestFormatIssuesDescription:
                 ],
             },
         )
-        
+
         description = format_issues_description(result)
-        
+
         # 验证包含不可用提示
         assert "暂不可用" in description or "⚠️" in description
 
     def test_description_empty_result(self):
         """测试空结果描述"""
         result = MockExecutionResult(success=True)
-        
+
         description = format_issues_description(result)
-        
+
         # 空结果应返回通过描述
         assert "通过" in description
 
     def test_description_return_type(self):
         """测试返回类型"""
         result = MockExecutionResult(success=True)
-        
+
         description = format_issues_description(result)
-        
+
         # 验证返回字符串
         assert isinstance(description, str)
 
@@ -579,9 +586,9 @@ class TestFormatterEdgeCases:
             success=True,
             document_results={},
         )
-        
+
         text = format_check_result(result)
-        
+
         # 应正常处理空结果
         assert "合规审查结果" in text
 
@@ -591,9 +598,9 @@ class TestFormatterEdgeCases:
             success=True,
             document_results={},
         )
-        
+
         formatted = format_simple_result(result)
-        
+
         assert formatted["issues_count"] == 0
         assert formatted["issues"] == []
 
@@ -611,9 +618,9 @@ class TestFormatterEdgeCases:
                 ],
             },
         )
-        
+
         description = format_issues_description(result)
-        
+
         # 没有失败时应返回通过描述
         assert "通过" in description
 
@@ -624,9 +631,8 @@ class TestFormatterEdgeCases:
             status=CheckStatus.FAIL,
             message="未知类型检查",
         )
-        
+
         lines = _format_single_result(result)
-        
+
         # 未知类型应显示原始名称
         assert "unknown_type" in " ".join(lines)
-

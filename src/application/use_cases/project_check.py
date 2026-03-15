@@ -120,10 +120,8 @@ class ProjectCheckUseCase:
                 requirements=requirements,
                 project_period=project_period,
             )
-            
-            checklist_data = await self.llm_client.generate_yaml(
-                prompt_text=prompt_text
-            )
+
+            checklist_data = await self.llm_client.generate_yaml(prompt_text=prompt_text)
 
             # 如果提供了项目周期，注入到清单中（用于有效期约束检查）
             if project_period and "checklist" in checklist_data:

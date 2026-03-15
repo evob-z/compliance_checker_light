@@ -31,8 +31,7 @@ mcp = FastMCP("compliance-checker")
 skill = ComplianceSkill()
 
 
-@mcp.tool(
-    description="""项目手续合规审查工具 - 自动检查项目文档的完整性、时效性和合规性
+@mcp.tool(description="""项目手续合规审查工具 - 自动检查项目文档的完整性、时效性和合规性
 
 【使用场景】
 当用户需要审查项目手续文档是否齐全、有效、合规时调用此工具。典型场景包括建设工程手续审查、发票合规检查、各类行政审批材料审查等。
@@ -73,8 +72,7 @@ requirements 是自然语言描述的检查要求，内部 AI 将严格按照此
 
 【返回结果】
 返回包含“核心审查结论”、“检查统计”及“问题详情”的中文 Markdown 报告。你可以直接引用顶部生成的核心结论来回复用户。
-"""
-)
+""")
 async def run_compliance_check(
     project_path: str,
     requirements: str,
@@ -134,7 +132,9 @@ async def run_compliance_check(
         return error_msg
 
     except Exception as e:
-        error_msg = f"❌ 执行错误：检查过程中发生异常\n异常类型：{type(e).__name__}\n详细信息：{str(e)}"
+        error_msg = (
+            f"❌ 执行错误：检查过程中发生异常\n异常类型：{type(e).__name__}\n详细信息：{str(e)}"
+        )
         logger.exception("合规检查执行失败")
         return error_msg
 

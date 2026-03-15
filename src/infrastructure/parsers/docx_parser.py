@@ -47,9 +47,7 @@ class DocxParser(DocumentParserProtocol):
             DocumentParseError: python-docx 未安装
         """
         if not DOCX_AVAILABLE:
-            raise DocumentParseError(
-                "python-docx 未安装，请运行: pip install python-docx"
-            )
+            raise DocumentParseError("python-docx 未安装，请运行: pip install python-docx")
 
         self.chars_per_page = chars_per_page
 
@@ -79,9 +77,7 @@ class DocxParser(DocumentParserProtocol):
 
         # 暂不支持 .doc 格式
         if suffix == ".doc":
-            raise DocumentParseError(
-                "暂不支持 .doc 格式，请先转换为 .docx"
-            )
+            raise DocumentParseError("暂不支持 .doc 格式，请先转换为 .docx")
 
         logger.info(f"开始解析 Word 文档: {file_path}")
 
@@ -176,14 +172,10 @@ class DocxParser(DocumentParserProtocol):
 
         if not full_text:
             # 空文档
-            pages_content.append(
-                PageContent(page_num=0, text="", has_text_layer=True)
-            )
+            pages_content.append(PageContent(page_num=0, text="", has_text_layer=True))
         elif len(full_text) <= self.chars_per_page:
             # 单页文档
-            pages_content.append(
-                PageContent(page_num=0, text=full_text, has_text_layer=True)
-            )
+            pages_content.append(PageContent(page_num=0, text=full_text, has_text_layer=True))
         else:
             # 分割为多页
             page_num = 0

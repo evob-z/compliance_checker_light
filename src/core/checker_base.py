@@ -88,7 +88,10 @@ class BaseChecker(ABC):
 
     @abstractmethod
     async def check(
-        self, documents: List["Document"], checklist: Optional["Checklist"], doc_checks: Dict[str, Any]
+        self,
+        documents: List["Document"],
+        checklist: Optional["Checklist"],
+        doc_checks: Dict[str, Any],
     ) -> CheckResult:
         """
         执行检查
@@ -140,14 +143,21 @@ class UnavailableChecker(BaseChecker):
         return f"[{self._name}] 检查器尚未实现"
 
     async def check(
-        self, documents: List["Document"], checklist: Optional["Checklist"], doc_checks: Dict[str, Any]
+        self,
+        documents: List["Document"],
+        checklist: Optional["Checklist"],
+        doc_checks: Dict[str, Any],
     ) -> CheckResult:
         """返回未实现的提示"""
         return CheckResult(
             check_type=self._name,
             status=CheckStatus.UNAVAILABLE,
             message=f"查不了这块，去联系项目负责人。功能 '{self._name}' 正在开发中...",
-            details={"contact": "项目负责人", "status": "开发中", "suggestion": "如需此功能，请联系开发团队添加该检查器"},
+            details={
+                "contact": "项目负责人",
+                "status": "开发中",
+                "suggestion": "如需此功能，请联系开发团队添加该检查器",
+            },
         )
 
     def is_available(self) -> bool:
@@ -190,7 +200,10 @@ class AliasCheckerWrapper(BaseChecker):
         return self._wrapped.version
 
     async def check(
-        self, documents: List["Document"], checklist: Optional["Checklist"], doc_checks: Dict[str, Any]
+        self,
+        documents: List["Document"],
+        checklist: Optional["Checklist"],
+        doc_checks: Dict[str, Any],
     ) -> CheckResult:
         """委托给被包装的检查器执行"""
         return await self._wrapped.check(documents, checklist, doc_checks)

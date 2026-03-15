@@ -23,7 +23,6 @@ from src.infrastructure.visual.region_detector import (
     PDFRegionDetector,
 )
 
-
 # ============== 测试 Fixtures ==============
 
 
@@ -314,16 +313,14 @@ def check_paddleocr_available():
     """检查 PaddleOCR 是否可用"""
     try:
         from paddleocr import PaddleOCR
+
         return True
     except (ImportError, OSError, Exception):
         # 捕获导入错误和DLL加载错误
         return False
 
 
-@pytest.mark.skipif(
-    not check_paddleocr_available(),
-    reason="PaddleOCR 未安装，跳过真实 OCR 测试"
-)
+@pytest.mark.skipif(not check_paddleocr_available(), reason="PaddleOCR 未安装，跳过真实 OCR 测试")
 class TestPaddleOCRRegionDetectorReal:
     """PaddleOCRRegionDetector 真实测试（需要安装 PaddleOCR）"""
 
@@ -343,7 +340,7 @@ class TestPaddleOCRRegionDetectorReal:
 
         # 验证检测到区域
         assert isinstance(regions, list), "返回结果应该是列表"
-        
+
         # dummy_seal.jpg 包含 "FAKE SEAL" 和 "法人签名: 张三 (测试)"
         # 应该能检测到至少一些文字
         assert len(regions) > 0, "应该检测到至少一个文本区域"
@@ -354,12 +351,12 @@ class TestPaddleOCRRegionDetectorReal:
             assert "bbox" in region, "区域应包含 bbox 字段"
             assert "confidence" in region, "区域应包含 confidence 字段"
             assert "page" in region, "区域应包含 page 字段"
-            
+
             # 验证 bbox 格式
             bbox = region["bbox"]
             assert len(bbox) == 4, "bbox 应该有 4 个值"
             assert all(isinstance(v, int) for v in bbox), "bbox 值应该是整数"
-            
+
             # 验证置信度范围
             assert 0 <= region["confidence"] <= 1, "置信度应在 0-1 范围内"
 
@@ -378,7 +375,7 @@ class TestPaddleOCRRegionDetectorReal:
 
         # 提取所有检测到的文本
         all_text = " ".join(r["text"] for r in regions)
-        
+
         # dummy_seal.jpg 应该包含 "FAKE SEAL" 或 "法人签名" 或 "张三" 等文字
         # 注意：OCR 可能识别不准确，我们只验证检测到了一些文字
         assert len(all_text.strip()) > 0, "应该检测到一些文字内容"
@@ -394,18 +391,18 @@ class TestPaddleOCRRegionDetectorReal:
             pytest.skip(f"测试图片不存在: {sample_image_path}")
 
         detector = PaddleOCRRegionDetector()
-        
+
         # 先检测所有区域，看看有什么文字
         regions = detector.detect_regions(str(sample_image_path))
         if not regions:
             pytest.skip("OCR 未检测到任何文字")
-        
+
         # 使用检测到的第一个文字作为关键词
         first_text = regions[0]["text"]
         keyword = first_text[:3] if len(first_text) >= 3 else first_text
-        
+
         result = detector.locate_keyword(str(sample_image_path), keyword)
-        
+
         if result:
             assert "page" in result
             assert "bbox" in result
@@ -420,14 +417,14 @@ def check_fitz_available():
     """检查 PyMuPDF 是否可用"""
     try:
         import fitz
+
         return True
     except ImportError:
         return False
 
 
 @pytest.mark.skipif(
-    not check_fitz_available(),
-    reason="PyMuPDF (fitz) 未安装，跳过 PDF 区域检测测试"
+    not check_fitz_available(), reason="PyMuPDF (fitz) 未安装，跳过 PDF 区域检测测试"
 )
 class TestPDFRegionDetectorReal:
     """PDFRegionDetector 真实测试"""
@@ -453,7 +450,7 @@ class TestPDFRegionDetectorReal:
             pytest.skip(f"测试 PDF 不存在: {sample_pdf_path}")
 
         detector = PDFRegionDetector()
-        
+
         # dummy_approval.pdf 包含 "Project Approval" 文本
         result = detector.locate_by_text(str(sample_pdf_path), "Approval")
 
@@ -461,10 +458,10 @@ class TestPDFRegionDetectorReal:
         assert "page" in result
         assert "bbox" in result
         assert "text" in result
-        
+
         # 验证 bbox 格式
         assert len(result["bbox"]) == 4
-        
+
         # 验证文本包含关键词
         assert "Approval" in result["text"] or "approval" in result["text"].lower()
 
@@ -510,11 +507,7 @@ class TestPDFRegionDetectorReal:
             pytest.skip(f"测试 PDF 不存在: {sample_pdf_path}")
 
         detector = PDFRegionDetector()
-        result = detector.locate_by_text(
-            str(sample_pdf_path),
-            "Document",
-            page_hint=0
-        )
+        result = detector.locate_by_text(str(sample_pdf_path), "Document", page_hint=0)
 
         assert result is not None
         assert result["page"] == 0
@@ -534,10 +527,10 @@ class TestPDFRegionDetectorReal:
         result = detector.locate_by_text(str(sample_pdf_path), "Document")
 
         assert result is not None
-        
+
         # 验证文本不为空
         assert len(result["text"].strip()) > 0, "返回的文本不应该为空"
-        
+
         # 验证 bbox 坐标合理（正数）
         bbox = result["bbox"]
         assert all(v >= 0 for v in bbox), "bbox 坐标应该为非负数"
@@ -559,7 +552,7 @@ class TestWithoutDependencies:
         """
         # 临时移除 fitz
         import src.infrastructure.visual.region_detector as module
-        
+
         detector = PDFRegionDetector()
         detector._fitz = None  # 模拟未安装
 

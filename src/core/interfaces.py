@@ -102,9 +102,7 @@ class VisualCheckerProtocol(Protocol):
         """
         ...
 
-    async def detect_seal(
-        self, image_path: str, context: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def detect_seal(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
         """
         检测图片中的公章
 
@@ -148,9 +146,7 @@ class LLMClientProtocol(Protocol):
     Infrastructure 层实现此接口（如 LLMClient）。
     """
 
-    async def complete(
-        self, prompt: str, temperature: float = 0.3, max_tokens: int = 2000
-    ) -> str:
+    async def complete(self, prompt: str, temperature: float = 0.3, max_tokens: int = 2000) -> str:
         """
         调用 LLM 完成文本生成
 

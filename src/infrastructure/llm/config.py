@@ -31,4 +31,6 @@ class LLMConfig:
     model: str = "gpt-4o"
     timeout: int = 60
     max_retries: int = 3
-    system_prompt: str = "你是一个严谨的数据处理助手，请严格按照要求的格式（如 JSON 或 YAML）输出，不要附带多余的解释。"
+    system_prompt: str = (
+        "你是一个严谨的数据处理助手，请严格按照要求的格式（如 JSON 或 YAML）输出，不要附带多余的解释。"
+    )

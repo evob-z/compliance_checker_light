@@ -37,9 +37,7 @@ Thumbs.db
 
 # Project specific
 .env
-*.pdf
-*.png
-*.jpg
+
 examples/test_docs/
 
 # Documentation (optional, remove if you want to track docs)

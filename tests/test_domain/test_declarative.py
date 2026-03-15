@@ -31,21 +31,20 @@ from src.domain.engine.declarative import (
     ExecutionResult,
 )
 
-
 # ============== Mock 检查器 ==============
 
 
 class MockCompletenessChecker(BaseChecker):
     """Mock 完整性检查器"""
-    
+
     @property
     def name(self) -> str:
         return "completeness"
-    
+
     @property
     def description(self) -> str:
         return "Mock 完整性检查器"
-    
+
     async def check(
         self,
         documents: List[Document],
@@ -62,15 +61,15 @@ class MockCompletenessChecker(BaseChecker):
 
 class MockTimelinessChecker(BaseChecker):
     """Mock 时效性检查器"""
-    
+
     @property
     def name(self) -> str:
         return "timeliness"
-    
+
     @property
     def description(self) -> str:
         return "Mock 时效性检查器"
-    
+
     async def check(
         self,
         documents: List[Document],
@@ -87,15 +86,15 @@ class MockTimelinessChecker(BaseChecker):
 
 class MockFailingChecker(BaseChecker):
     """Mock 失败检查器"""
-    
+
     @property
     def name(self) -> str:
         return "failing_check"
-    
+
     @property
     def description(self) -> str:
         return "Mock 失败检查器"
-    
+
     async def check(
         self,
         documents: List[Document],
@@ -112,15 +111,15 @@ class MockFailingChecker(BaseChecker):
 
 class MockErrorChecker(BaseChecker):
     """Mock 错误检查器"""
-    
+
     @property
     def name(self) -> str:
         return "error_check"
-    
+
     @property
     def description(self) -> str:
         return "Mock 错误检查器"
-    
+
     async def check(
         self,
         documents: List[Document],
@@ -340,7 +339,7 @@ def test_engine_init_with_none_registry():
     """
     with pytest.raises(ValueError) as exc_info:
         DeclarativeCheckEngine(registry=None)
-    
+
     assert "registry 不能为 None" in str(exc_info.value), "错误信息应包含 'registry 不能为 None'"
 
 
@@ -355,12 +354,12 @@ def test_engine_init_with_custom_config(registry):
         "max_concurrent_checks": 10,
         "check_timeout": 600,
     }
-    
+
     engine = DeclarativeCheckEngine(
         registry=registry,
         concurrency_config=custom_config,
     )
-    
+
     assert engine.concurrency_config == custom_config, "配置应正确存储"
 
 
@@ -503,16 +502,22 @@ def test_aggregate_results(engine):
     )
 
     results = [
-        (task1, CheckResult(
-            check_type="timeliness",
-            status=CheckStatus.PASS,
-            message="通过",
-        )),
-        (task2, CheckResult(
-            check_type="completeness",
-            status=CheckStatus.PASS,
-            message="通过",
-        )),
+        (
+            task1,
+            CheckResult(
+                check_type="timeliness",
+                status=CheckStatus.PASS,
+                message="通过",
+            ),
+        ),
+        (
+            task2,
+            CheckResult(
+                check_type="completeness",
+                status=CheckStatus.PASS,
+                message="通过",
+            ),
+        ),
     ]
 
     execution_result = engine._aggregate_results(results, [task1, task2])
@@ -522,7 +527,7 @@ def test_aggregate_results(engine):
     assert execution_result.success is True, "全部通过时 success 应为 True"
     assert execution_result.summary["passed"] == 2, "应有 2 个通过"
     assert execution_result.summary["failed"] == 0, "不应有失败"
-    
+
     # 验证文档分组
     assert "文档A.pdf" in execution_result.document_results, "应包含文档A的结果"
     assert CheckTask.PROJECT_LEVEL_MARKER in execution_result.document_results, "应包含项目级别结果"
@@ -546,11 +551,14 @@ def test_aggregate_results_with_failures(engine):
     )
 
     results = [
-        (task, CheckResult(
-            check_type="test",
-            status=CheckStatus.FAIL,
-            message="失败",
-        )),
+        (
+            task,
+            CheckResult(
+                check_type="test",
+                status=CheckStatus.FAIL,
+                message="失败",
+            ),
+        ),
     ]
 
     execution_result = engine._aggregate_results(results, [task])
@@ -577,11 +585,14 @@ def test_aggregate_results_with_unavailable(engine):
     )
 
     results = [
-        (task, CheckResult(
-            check_type="unavailable_feature",
-            status=CheckStatus.UNAVAILABLE,
-            message="功能不可用",
-        )),
+        (
+            task,
+            CheckResult(
+                check_type="unavailable_feature",
+                status=CheckStatus.UNAVAILABLE,
+                message="功能不可用",
+            ),
+        ),
     ]
 
     execution_result = engine._aggregate_results(results, [task])

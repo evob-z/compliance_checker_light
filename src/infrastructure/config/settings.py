@@ -16,7 +16,6 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from ..llm.config import LLMConfig
 
-
 # ==================== 路径默认值 ====================
 DEFAULT_DOCUMENT_PATH = Path("./documents")
 DEFAULT_OUTPUT_DIR = Path("./output")

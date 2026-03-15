@@ -48,9 +48,7 @@ class MockVisualClient:
         """检查服务是否可用"""
         return self._available
 
-    async def detect_seal(
-        self, image_path: str, context: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def detect_seal(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
         """
         检测图片中的公章（模拟）
 
@@ -222,7 +220,7 @@ class MockPDFConverter:
             模拟的图片字节流列表
         """
         # 返回模拟的 PNG 图片字节流（PNG 魔数 + 一些数据）
-        mock_image = b'\x89PNG\r\n\x1a\n' + b'MOCK_IMAGE_DATA' * 100
+        mock_image = b"\x89PNG\r\n\x1a\n" + b"MOCK_IMAGE_DATA" * 100
         return [mock_image for _ in range(self.num_pages)]
 
 
@@ -319,11 +317,11 @@ async def test_visual_check_seal_found(checker, sample_checklist):
     assert isinstance(result, CheckResult), "返回结果应为 CheckResult 类型"
     assert result.check_type == "compliance", "check_type 应为 'compliance'"
     assert result.status == CheckStatus.PASS, "检测到印章应为 PASS"
-    
+
     # 验证 message 字段
     assert isinstance(result.message, str), "message 应为字符串类型"
     assert len(result.message) > 0, "message 不应为空"
-    
+
     # 验证 details 字段结构
     assert isinstance(result.details, dict), "details 应为字典类型"
     assert "check_type" in result.details, "details 应包含 check_type"
@@ -333,7 +331,7 @@ async def test_visual_check_seal_found(checker, sample_checklist):
     assert "error_count" in result.details, "details 应包含 error_count"
     assert "unclear_count" in result.details, "details 应包含 unclear_count"
     assert "document_results" in result.details, "details 应包含 document_results"
-    
+
     # 验证统计信息
     assert result.details["total_documents"] == 1, "总文档数应为 1"
     assert result.details["valid_count"] == 1, "有效文档数应为 1"
@@ -344,7 +342,7 @@ async def test_visual_check_seal_found(checker, sample_checklist):
     assert "document_name" in doc_result, "结果应包含 document_name"
     assert "seal_result" in doc_result, "结果应包含 seal_result"
     assert "status" in doc_result, "结果应包含 status"
-    
+
     assert doc_result["seal_result"]["found"] is True, "应检测到印章"
     assert doc_result["seal_result"]["confidence"] >= 0.7, "置信度应 >= 0.7"
     assert "reasoning" in doc_result["seal_result"], "结果应包含 reasoning"
@@ -444,7 +442,7 @@ async def test_visual_check_not_found(checker, sample_checklist):
     assert result.status == CheckStatus.FAIL, "未检测到印章应为 FAIL"
     assert result.details["missing_count"] == 1, "缺失文档数应为 1"
     assert result.details["valid_count"] == 0, "有效文档数应为 0"
-    
+
     # 验证 issues 列表
     assert isinstance(result.issues, list), "issues 应为列表类型"
     assert len(result.issues) == 1, "应有 1 个 issue"
@@ -485,7 +483,9 @@ async def test_visual_check_unavailable_service(unavailable_visual_client, sampl
     assert result.status == CheckStatus.UNAVAILABLE, "服务不可用应为 UNAVAILABLE"
     assert "不可用" in result.message, "message 应包含 '不可用'"
     assert "reason" in result.details, "details 应包含 reason 字段"
-    assert result.details["reason"] == "visual_client_unavailable", "reason 应为 visual_client_unavailable"
+    assert (
+        result.details["reason"] == "visual_client_unavailable"
+    ), "reason 应为 visual_client_unavailable"
 
 
 @pytest.mark.asyncio
@@ -632,16 +632,19 @@ async def test_visual_check_determine_status(checker):
     check_type = VisualCheckType.SEAL
 
     # 未检测到
-    assert checker._determine_status(False, 0.9, check_type) == CheckStatus.MISSING, \
-        "未检测到应返回 MISSING"
+    assert (
+        checker._determine_status(False, 0.9, check_type) == CheckStatus.MISSING
+    ), "未检测到应返回 MISSING"
 
     # 低置信度
-    assert checker._determine_status(True, 0.5, check_type) == CheckStatus.UNCLEAR, \
-        "低置信度应返回 UNCLEAR"
+    assert (
+        checker._determine_status(True, 0.5, check_type) == CheckStatus.UNCLEAR
+    ), "低置信度应返回 UNCLEAR"
 
     # 正常检测到
-    assert checker._determine_status(True, 0.9, check_type) == CheckStatus.VALID, \
-        "正常检测到应返回 VALID"
+    assert (
+        checker._determine_status(True, 0.9, check_type) == CheckStatus.VALID
+    ), "正常检测到应返回 VALID"
 
 
 # ============== 新增测试用例 ==============
@@ -660,8 +663,11 @@ async def test_visual_checker_properties(checker):
     assert checker.name == "compliance", "检查器名称应为 'compliance'"
     assert isinstance(checker.description, str), "description 应为字符串"
     assert len(checker.description) > 0, "description 不应为空"
-    assert "印章" in checker.description or "签名" in checker.description or "视觉" in checker.description, \
-        "description 应描述视觉检查"
+    assert (
+        "印章" in checker.description
+        or "签名" in checker.description
+        or "视觉" in checker.description
+    ), "description 应描述视觉检查"
     assert checker.is_available() is True, "检查器应可用"
 
 
@@ -702,27 +708,32 @@ async def test_visual_check_unclear_result(mock_visual_client, sample_checklist)
     - status 为 UNCLEAR
     - unclear_count 为 1
     """
+
     # 创建返回低置信度的 Mock
     class LowConfidenceMockClient:
         def is_available(self) -> bool:
             return True
-        
-        async def detect_seal(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
+
+        async def detect_seal(
+            self, image_path: str, context: Optional[str] = None
+        ) -> Dict[str, Any]:
             return {
                 "success": True,
                 "found": True,
                 "confidence": 0.5,  # 低置信度
                 "reasoning": "置信度较低",
             }
-        
-        async def detect_signature(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
+
+        async def detect_signature(
+            self, image_path: str, context: Optional[str] = None
+        ) -> Dict[str, Any]:
             return {
                 "success": True,
                 "found": False,
                 "confidence": 0.5,
                 "reasoning": "置信度较低",
             }
-    
+
     checker = VisualChecker(
         visual_client=LowConfidenceMockClient(),
         pdf_converter=MockPDFConverter(),  # 提供 PDF 转换器
@@ -730,13 +741,13 @@ async def test_visual_check_unclear_result(mock_visual_client, sample_checklist)
     )
 
     documents = [create_document("测试文档.jpg")]  # 使用图片格式避免 PDF 转换
-    
+
     result = await checker.check(
         documents=documents,
         checklist=sample_checklist,
         doc_checks={"visual_type": "seal"},
     )
-    
+
     assert result.details["unclear_count"] == 1, "应有 1 个不明确结果"
 
 
@@ -748,27 +759,32 @@ async def test_visual_check_both_partial(mock_visual_client, sample_checklist):
     预期结果：
     - status 为 VALID（至少检测到一个）
     """
+
     # 创建只检测到印章的 Mock
     class PartialMockClient:
         def is_available(self) -> bool:
             return True
-        
-        async def detect_seal(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
+
+        async def detect_seal(
+            self, image_path: str, context: Optional[str] = None
+        ) -> Dict[str, Any]:
             return {
                 "success": True,
                 "found": True,
                 "confidence": 0.9,
                 "reasoning": "检测到印章",
             }
-        
-        async def detect_signature(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
+
+        async def detect_signature(
+            self, image_path: str, context: Optional[str] = None
+        ) -> Dict[str, Any]:
             return {
                 "success": True,
                 "found": False,
                 "confidence": 0.9,
                 "reasoning": "未检测到签名",
             }
-    
+
     checker = VisualChecker(
         visual_client=PartialMockClient(),
         pdf_converter=MockPDFConverter(),  # 提供 PDF 转换器
@@ -776,13 +792,13 @@ async def test_visual_check_both_partial(mock_visual_client, sample_checklist):
     )
 
     documents = [create_document("测试文档.jpg")]  # 使用图片格式避免 PDF 转换
-    
+
     result = await checker.check(
         documents=documents,
         checklist=sample_checklist,
         doc_checks={"visual_type": "both"},
     )
-    
+
     # 至少检测到一个，状态应为 VALID
     assert result.status == CheckStatus.PASS, "检测到至少一个应为 PASS"
 
@@ -796,30 +812,35 @@ async def test_visual_check_error_in_detection(mock_visual_client, sample_checkl
     - status 为 ERROR
     - message 包含错误信息
     """
+
     # 创建会抛出异常的 Mock
     class ErrorMockClient:
         def is_available(self) -> bool:
             return True
-        
-        async def detect_seal(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
+
+        async def detect_seal(
+            self, image_path: str, context: Optional[str] = None
+        ) -> Dict[str, Any]:
             raise RuntimeError("检测失败")
-        
-        async def detect_signature(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
+
+        async def detect_signature(
+            self, image_path: str, context: Optional[str] = None
+        ) -> Dict[str, Any]:
             return {"success": True, "found": False, "confidence": 0.5}
-    
+
     checker = VisualChecker(
         visual_client=ErrorMockClient(),
         confidence_threshold=0.7,
     )
-    
+
     documents = [create_document("测试文档.pdf")]
-    
+
     result = await checker.check(
         documents=documents,
         checklist=sample_checklist,
         doc_checks={"visual_type": "seal"},
     )
-    
+
     # 检测过程中发生错误
     assert result.details["error_count"] == 1, "应有 1 个错误"
 
@@ -834,7 +855,7 @@ async def test_visual_check_parse_unknown_type(checker):
     """
     # 传入未知类型
     result = checker._parse_check_type({"visual_type": "unknown_type"})
-    
+
     # 应返回默认类型
     assert result == VisualCheckType.BOTH, "未知类型应返回默认类型 BOTH"
 
@@ -896,7 +917,9 @@ async def test_visual_check_pdf_file_with_converter(checker, sample_checklist):
 
 
 @pytest.mark.asyncio
-async def test_visual_check_pdf_file_without_converter(checker_without_pdf_converter, sample_checklist):
+async def test_visual_check_pdf_file_without_converter(
+    checker_without_pdf_converter, sample_checklist
+):
     """
     测试场景：检查 PDF 文件（无 PDF 转换器）
 
@@ -930,14 +953,15 @@ async def test_visual_check_pdf_multi_page(checker, sample_checklist):
     - 检查所有页面
     - 只要有任何一页通过，整体就通过
     """
+
     # 使用多页转换器
     class MultiPageMockConverter:
         async def convert_to_images(self, file_path_or_bytes: str | bytes) -> List[bytes]:
             # 返回 3 页，其中第 2 页模拟检测到印章
             return [
-                b'\x89PNG\r\n\x1a\nPAGE1',  # 第 1 页：无印章
-                b'\x89PNG\r\n\x1a\nPAGE2_SEAL',  # 第 2 页：有印章（文件名包含关键词）
-                b'\x89PNG\r\n\x1a\nPAGE3',  # 第 3 页：无印章
+                b"\x89PNG\r\n\x1a\nPAGE1",  # 第 1 页：无印章
+                b"\x89PNG\r\n\x1a\nPAGE2_SEAL",  # 第 2 页：有印章（文件名包含关键词）
+                b"\x89PNG\r\n\x1a\nPAGE3",  # 第 3 页：无印章
             ]
 
     checker_with_multi = VisualChecker(

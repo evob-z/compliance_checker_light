@@ -5,12 +5,17 @@ Domain 层检查器模块
 """
 
 from .timeliness import TimelinessChecker
-from .compliance import VisualChecker, SEAL_DETECT_PROMPT, SIGNATURE_DETECT_PROMPT, BOTH_DETECT_PROMPT
+from .compliance import (
+    VisualChecker,
+    SEAL_DETECT_PROMPT,
+    SIGNATURE_DETECT_PROMPT,
+    BOTH_DETECT_PROMPT,
+)
 
 __all__ = [
-    "TimelinessChecker", 
+    "TimelinessChecker",
     "VisualChecker",
     "SEAL_DETECT_PROMPT",
-    "SIGNATURE_DETECT_PROMPT", 
+    "SIGNATURE_DETECT_PROMPT",
     "BOTH_DETECT_PROMPT",
 ]

@@ -57,9 +57,7 @@ class PDFParser(DocumentParserProtocol):
             DocumentParseError: PyMuPDF 未安装
         """
         if not FITZ_AVAILABLE:
-            raise DocumentParseError(
-                "PyMuPDF 未安装，请运行: pip install PyMuPDF"
-            )
+            raise DocumentParseError("PyMuPDF 未安装，请运行: pip install PyMuPDF")
 
         self._ocr_engine = ocr_engine
         self.use_ocr = use_ocr
@@ -234,8 +232,7 @@ class PDFParser(DocumentParserProtocol):
         if self._ocr_engine is None:
             logger.warning("OCR 引擎未提供，返回空内容")
             return [
-                PageContent(page_num=i, text="", has_text_layer=False)
-                for i in range(total_pages)
+                PageContent(page_num=i, text="", has_text_layer=False) for i in range(total_pages)
             ]
 
         try:
@@ -259,8 +256,7 @@ class PDFParser(DocumentParserProtocol):
             logger.error(f"OCR 识别失败: {e}")
             # OCR 失败时返回空内容
             pages_content = [
-                PageContent(page_num=i, text="", has_text_layer=False)
-                for i in range(total_pages)
+                PageContent(page_num=i, text="", has_text_layer=False) for i in range(total_pages)
             ]
 
         return pages_content

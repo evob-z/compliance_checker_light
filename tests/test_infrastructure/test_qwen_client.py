@@ -24,7 +24,6 @@ from src.infrastructure.visual.qwen_client import (
     ImageReadError,
 )
 
-
 # ============== 环境配置检查 ==============
 
 
@@ -33,7 +32,7 @@ def get_vision_config():
     api_key = os.getenv("VISION_API_KEY") or os.getenv("LLM_API_KEY")
     base_url = os.getenv("VISION_BASE_URL") or os.getenv("LLM_BASE_URL")
     model = os.getenv("VISION_MODEL", "qwen3-vl-flash")
-    
+
     return {
         "api_key": api_key,
         "base_url": base_url,
@@ -214,7 +213,7 @@ class TestQwenVLClientIsAvailable:
 
 @pytest.mark.skipif(
     not is_vision_available(),
-    reason="视觉 API 未配置（需要设置 VISION_API_KEY 或 LLM_API_KEY 环境变量）"
+    reason="视觉 API 未配置（需要设置 VISION_API_KEY 或 LLM_API_KEY 环境变量）",
 )
 @pytest.mark.asyncio
 class TestQwenVLClientRealAPI:
@@ -271,7 +270,7 @@ class TestQwenVLClientRealAPI:
 
         # 验证 API 调用成功
         assert result["success"] is True, f"API 调用应该成功: {result.get('reasoning', '')}"
-        
+
         # 验证 reasoning 包含实际内容（不只是空字符串）
         assert len(result["reasoning"].strip()) > 0, "reasoning 应该包含实际内容"
 
@@ -324,7 +323,7 @@ class TestQwenVLClientRealAPI:
 
         # 验证 API 调用成功
         assert result["success"] is True, f"API 调用应该成功: {result.get('reasoning', '')}"
-        
+
         # 验证 reasoning 包含实际内容
         assert len(result["reasoning"].strip()) > 0, "reasoning 应该包含实际内容"
 
@@ -369,6 +368,7 @@ class TestQwenVLClientErrorHandling:
         client = QwenVLClient(api_key="test-key")
 
         import asyncio
+
         with pytest.raises(ValueError) as exc_info:
             asyncio.run(client.detect_seal("/path/to/image.jpg"))
 
@@ -384,6 +384,7 @@ class TestQwenVLClientErrorHandling:
         client = QwenVLClient(api_key="test-key")
 
         import asyncio
+
         with pytest.raises(ValueError) as exc_info:
             asyncio.run(client.detect_signature("/path/to/image.jpg"))
 
@@ -399,6 +400,7 @@ class TestQwenVLClientErrorHandling:
         client = QwenVLClient(api_key="test-key")
 
         import asyncio
+
         with pytest.raises(ValueError) as exc_info:
             asyncio.run(client.detect_seal_from_bytes(b"fake_image_bytes"))
 
@@ -414,6 +416,7 @@ class TestQwenVLClientErrorHandling:
         client = QwenVLClient(api_key="test-key")
 
         import asyncio
+
         with pytest.raises(ValueError) as exc_info:
             asyncio.run(client.detect_signature_from_bytes(b"fake_image_bytes"))
 

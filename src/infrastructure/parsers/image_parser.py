@@ -51,9 +51,7 @@ class ImageParser(DocumentParserProtocol):
             DocumentParseError: Pillow 未安装
         """
         if not PIL_AVAILABLE:
-            raise DocumentParseError(
-                "Pillow 未安装，请运行: pip install Pillow"
-            )
+            raise DocumentParseError("Pillow 未安装，请运行: pip install Pillow")
 
         self._ocr_engine = ocr_engine
 

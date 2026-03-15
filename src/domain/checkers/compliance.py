@@ -140,7 +140,9 @@ class VisualChecker(BaseChecker):
         try:
             return VisualCheckType(check_type_str.lower())
         except ValueError:
-            logger.warning(f"未知的检查类型: {check_type_str}，使用默认值: {self.default_check_type}")
+            logger.warning(
+                f"未知的检查类型: {check_type_str}，使用默认值: {self.default_check_type}"
+            )
             return VisualCheckType(self.default_check_type)
 
     def _determine_status(
@@ -232,14 +234,10 @@ class VisualChecker(BaseChecker):
             # 根据文件类型选择处理方式
             if self._is_image_file(document.path):
                 # 图片文件：直接检测
-                return await self._check_image_document(
-                    document, check_type, context, page_hint
-                )
+                return await self._check_image_document(document, check_type, context, page_hint)
             elif self._is_pdf_file(document.path):
                 # PDF 文件：需要转换为图片后检测
-                return await self._check_pdf_document(
-                    document, check_type, context, page_hint
-                )
+                return await self._check_pdf_document(document, check_type, context, page_hint)
             else:
                 # 不支持的文件类型
                 result["status"] = CheckStatus.ERROR.value
@@ -292,9 +290,7 @@ class VisualChecker(BaseChecker):
             if seal_result.get("success"):
                 found = seal_result.get("found", False)
                 confidence = seal_result.get("confidence", 0.0)
-                result["status"] = self._determine_status(
-                    found, confidence, check_type
-                ).value
+                result["status"] = self._determine_status(found, confidence, check_type).value
                 result["message"] = seal_result.get("reasoning", "")
             else:
                 result["status"] = CheckStatus.ERROR.value
@@ -310,9 +306,7 @@ class VisualChecker(BaseChecker):
             if sig_result.get("success"):
                 found = sig_result.get("found", False)
                 confidence = sig_result.get("confidence", 0.0)
-                result["status"] = self._determine_status(
-                    found, confidence, check_type
-                ).value
+                result["status"] = self._determine_status(found, confidence, check_type).value
                 result["message"] = sig_result.get("reasoning", "")
             else:
                 result["status"] = CheckStatus.ERROR.value
@@ -342,12 +336,16 @@ class VisualChecker(BaseChecker):
             # 构建综合消息
             messages = []
             if seal_result.get("success"):
-                messages.append(f"印章: {'已发现' if seal_found else '未发现'} (置信度: {seal_conf:.2f})")
+                messages.append(
+                    f"印章: {'已发现' if seal_found else '未发现'} (置信度: {seal_conf:.2f})"
+                )
             else:
                 messages.append(f"印章检测失败: {seal_result.get('error', '未知错误')}")
 
             if sig_result.get("success"):
-                messages.append(f"签名: {'已发现' if sig_found else '未发现'} (置信度: {sig_conf:.2f})")
+                messages.append(
+                    f"签名: {'已发现' if sig_found else '未发现'} (置信度: {sig_conf:.2f})"
+                )
             else:
                 messages.append(f"签名检测失败: {sig_result.get('error', '未知错误')}")
 
@@ -440,7 +438,9 @@ class VisualChecker(BaseChecker):
                 # 如果找到目标元素，立即返回成功
                 if page_result["status"] == CheckStatus.VALID.value:
                     result.update(page_result)
-                    result["message"] = f"第 {page_num} 页检测通过: {page_result.get('message', '')}"
+                    result["message"] = (
+                        f"第 {page_num} 页检测通过: {page_result.get('message', '')}"
+                    )
                     return result
 
                 # 保存最后一页的结果用于返回
@@ -493,17 +493,13 @@ class VisualChecker(BaseChecker):
                 )
             else:
                 # 回退到临时文件方式
-                seal_result = await self._detect_with_temp_file(
-                    image_bytes, "seal"
-                )
+                seal_result = await self._detect_with_temp_file(image_bytes, "seal")
             result["seal_result"] = seal_result
 
             if seal_result.get("success"):
                 found = seal_result.get("found", False)
                 confidence = seal_result.get("confidence", 0.0)
-                result["status"] = self._determine_status(
-                    found, confidence, check_type
-                ).value
+                result["status"] = self._determine_status(found, confidence, check_type).value
                 result["message"] = seal_result.get("reasoning", "")
             else:
                 result["status"] = CheckStatus.ERROR.value
@@ -516,17 +512,13 @@ class VisualChecker(BaseChecker):
                     context=SIGNATURE_DETECT_PROMPT,
                 )
             else:
-                sig_result = await self._detect_with_temp_file(
-                    image_bytes, "signature"
-                )
+                sig_result = await self._detect_with_temp_file(image_bytes, "signature")
             result["signature_result"] = sig_result
 
             if sig_result.get("success"):
                 found = sig_result.get("found", False)
                 confidence = sig_result.get("confidence", 0.0)
-                result["status"] = self._determine_status(
-                    found, confidence, check_type
-                ).value
+                result["status"] = self._determine_status(found, confidence, check_type).value
                 result["message"] = sig_result.get("reasoning", "")
             else:
                 result["status"] = CheckStatus.ERROR.value
@@ -544,12 +536,8 @@ class VisualChecker(BaseChecker):
                     context=SIGNATURE_DETECT_PROMPT,
                 )
             else:
-                seal_result = await self._detect_with_temp_file(
-                    image_bytes, "seal"
-                )
-                sig_result = await self._detect_with_temp_file(
-                    image_bytes, "signature"
-                )
+                seal_result = await self._detect_with_temp_file(image_bytes, "seal")
+                sig_result = await self._detect_with_temp_file(image_bytes, "signature")
 
             result["seal_result"] = seal_result
             result["signature_result"] = sig_result
@@ -564,12 +552,16 @@ class VisualChecker(BaseChecker):
             # 构建综合消息
             messages = []
             if seal_result.get("success"):
-                messages.append(f"印章: {'已发现' if seal_found else '未发现'} (置信度: {seal_conf:.2f})")
+                messages.append(
+                    f"印章: {'已发现' if seal_found else '未发现'} (置信度: {seal_conf:.2f})"
+                )
             else:
                 messages.append(f"印章检测失败: {seal_result.get('error', '未知错误')}")
 
             if sig_result.get("success"):
-                messages.append(f"签名: {'已发现' if sig_found else '未发现'} (置信度: {sig_conf:.2f})")
+                messages.append(
+                    f"签名: {'已发现' if sig_found else '未发现'} (置信度: {sig_conf:.2f})"
+                )
             else:
                 messages.append(f"签名检测失败: {sig_result.get('error', '未知错误')}")
 
@@ -748,11 +740,13 @@ class VisualChecker(BaseChecker):
         issues = []
         for r in results:
             if r["status"] != CheckStatus.VALID.value:
-                issues.append({
-                    "document": r["document_name"],
-                    "status": r["status"],
-                    "message": r["message"],
-                })
+                issues.append(
+                    {
+                        "document": r["document_name"],
+                        "status": r["status"],
+                        "message": r["message"],
+                    }
+                )
 
         return CheckResult(
             check_type=self.name,

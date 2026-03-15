@@ -57,9 +57,11 @@ class LLMSemanticMatcher(SemanticMatcherProtocol):
 
                 # 如果未提供 api_key，从环境变量读取
                 api_key = self._api_key or os.getenv("EMBED_API_KEY") or os.getenv("LLM_API_KEY")
-                base_url = self._base_url or os.getenv(
-                    "EMBED_BASE_URL"
-                ) or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+                base_url = (
+                    self._base_url
+                    or os.getenv("EMBED_BASE_URL")
+                    or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+                )
 
                 if not api_key:
                     raise ValueError("未配置 EMBED_API_KEY 或 LLM_API_KEY")

@@ -74,9 +74,7 @@ class MockSemanticMatcher:
         base_value = len(text) / 1000.0
         return [base_value] * 128
 
-    async def find_best_match(
-        self, text: str, candidates: List[str]
-    ) -> Tuple[str, float]:
+    async def find_best_match(self, text: str, candidates: List[str]) -> Tuple[str, float]:
         """
         从候选列表中找到最佳匹配（模拟）
 
@@ -207,13 +205,13 @@ async def test_completeness_all_documents_present(checker, sample_checklist):
     assert isinstance(result, CheckResult), "返回结果应为 CheckResult 类型"
     assert result.check_type == "completeness", "check_type 应为 'completeness'"
     assert result.status == CheckStatus.PASS, "所有文档存在时状态应为 PASS"
-    
+
     # 验证 message 字段
     assert isinstance(result.message, str), "message 应为字符串类型"
     assert len(result.message) > 0, "message 不应为空"
     assert "所有" in result.message, "message 应包含 '所有'"
     assert "已上传" in result.message, "message 应包含 '已上传'"
-    
+
     # 验证 details 字段结构
     assert isinstance(result.details, dict), "details 应为字典类型"
     assert "completeness_result" in result.details, "details 应包含 completeness_result"
@@ -237,7 +235,7 @@ async def test_completeness_all_documents_present(checker, sample_checklist):
     for match in matches:
         for field in required_match_fields:
             assert field in match, f"匹配结果应包含 '{field}' 字段"
-        
+
         # 验证字段值有效性
         assert match["status"] == CheckStatus.VALID.value, "匹配状态应为 VALID"
         assert match["matched_file"] is not None, "matched_file 不应为 None"
@@ -289,7 +287,7 @@ async def test_completeness_missing_documents(checker, sample_checklist):
     assert isinstance(result, CheckResult), "返回结果应为 CheckResult 类型"
     assert result.check_type == "completeness", "check_type 应为 'completeness'"
     assert result.status == CheckStatus.INCOMPLETE, "部分文档缺失时状态应为 INCOMPLETE"
-    
+
     # 验证 message 字段
     assert isinstance(result.message, str), "message 应为字符串类型"
     assert "缺少" in result.message, "message 应包含 '缺少'"
@@ -304,10 +302,10 @@ async def test_completeness_missing_documents(checker, sample_checklist):
     # ========== 验证缺失文档状态 ==========
     matches = result.details["matches"]
     assert isinstance(matches, list), "matches 应为列表类型"
-    
+
     missing_docs = [m for m in matches if m["status"] == CheckStatus.MISSING.value]
     assert len(missing_docs) >= 1, "至少应有 1 个 MISSING 状态的文档"
-    
+
     # 验证缺失文档的字段完整性
     for missing in missing_docs:
         assert "document_name" in missing, "缺失文档应包含 document_name"
@@ -315,7 +313,7 @@ async def test_completeness_missing_documents(checker, sample_checklist):
         assert "matched_file" in missing, "缺失文档应包含 matched_file"
         assert "match_type" in missing, "缺失文档应包含 match_type"
         assert "similarity" in missing, "缺失文档应包含 similarity"
-        
+
         # 验证缺失文档的字段值
         assert missing["status"] == CheckStatus.MISSING.value, "状态应为 MISSING"
         assert missing["matched_file"] is None, "缺失文档的 matched_file 应为 None"
@@ -378,14 +376,14 @@ async def test_completeness_no_checklist(checker):
     assert isinstance(result, CheckResult), "返回结果应为 CheckResult 类型"
     assert result.check_type == "completeness", "check_type 应为 'completeness'"
     assert result.status == CheckStatus.ERROR, "缺少清单时状态应为 ERROR"
-    
+
     # 验证 message 字段
     assert isinstance(result.message, str), "message 应为字符串类型"
     assert "缺少审核清单" in result.message, "message 应包含 '缺少审核清单'"
-    
+
     # 验证 details 字段
     assert isinstance(result.details, dict), "details 应为字典类型"
-    
+
     # 验证 issues 列表
     assert isinstance(result.issues, list), "issues 应为列表类型"
 
@@ -415,7 +413,7 @@ async def test_completeness_empty_documents(checker, sample_checklist):
     assert isinstance(result, CheckResult), "返回结果应为 CheckResult 类型"
     assert result.check_type == "completeness", "check_type 应为 'completeness'"
     assert result.status == CheckStatus.INCOMPLETE, "空文档列表状态应为 INCOMPLETE"
-    
+
     # 验证统计信息
     assert result.details["total_required"] == 3, "必需文档总数应为 3"
     assert result.details["uploaded"] == 0, "已上传数量应为 0"
@@ -424,7 +422,7 @@ async def test_completeness_empty_documents(checker, sample_checklist):
     # ========== 验证所有文档都是 MISSING 状态 ==========
     matches = result.details["matches"]
     assert len(matches) == 3, "应有 3 个匹配结果"
-    
+
     for match in matches:
         assert match["status"] == CheckStatus.MISSING.value, "所有文档状态应为 MISSING"
         assert match["matched_file"] is None, "matched_file 应为 None"
@@ -464,13 +462,15 @@ async def test_completeness_alias_match(checker, sample_checklist):
 
     # ========== 验证匹配类型 ==========
     matches = result.details["matches"]
-    
+
     # 验证别名匹配的 similarity 应该是 0.95
     alias_matches = [m for m in matches if m["match_type"] == MatchType.ALIAS.value]
     assert len(alias_matches) >= 1, "至少应有 1 个别名匹配"
-    
+
     for match in alias_matches:
-        assert match["similarity"] == 0.95, f"别名匹配的 similarity 应为 0.95，实际为 {match['similarity']}"
+        assert (
+            match["similarity"] == 0.95
+        ), f"别名匹配的 similarity 应为 0.95，实际为 {match['similarity']}"
         assert match["matched_file"] is not None, "别名匹配的 matched_file 不应为 None"
         assert match["status"] == CheckStatus.VALID.value, "别名匹配的状态应为 VALID"
 
@@ -539,7 +539,7 @@ async def test_completeness_exact_match(checker, sample_checklist):
     # 验证有精确匹配
     matches = result.details["matches"]
     exact_matches = [m for m in matches if m["match_type"] == MatchType.EXACT.value]
-    
+
     assert len(exact_matches) >= 1, "应有至少 1 个精确匹配"
     for match in exact_matches:
         assert match["similarity"] == 1.0, "精确匹配的 similarity 应为 1.0"
@@ -569,7 +569,7 @@ async def test_completeness_semantic_match_type(checker, sample_checklist):
     # 验证有语义匹配
     matches = result.details["matches"]
     semantic_matches = [m for m in matches if m["match_type"] == MatchType.SEMANTIC.value]
-    
+
     # 由于 MockSemanticMatcher 的实现，包含相同关键词会返回 0.9 的相似度
     assert len(semantic_matches) >= 1, "应有至少 1 个语义匹配"
     for match in semantic_matches:
@@ -635,7 +635,9 @@ async def test_completeness_checker_properties(checker):
     assert checker.name == "completeness", "检查器名称应为 'completeness'"
     assert isinstance(checker.description, str), "description 应为字符串"
     assert len(checker.description) > 0, "description 不应为空"
-    assert "完整性" in checker.description or "文档" in checker.description, "description 应描述完整性检查"
+    assert (
+        "完整性" in checker.description or "文档" in checker.description
+    ), "description 应描述完整性检查"
     assert hasattr(checker, "version"), "应有 version 属性"
 
 
@@ -702,7 +704,7 @@ async def test_completeness_multiple_matches_for_same_document(checker, sample_c
     # 验证匹配结果
     matches = result.details["matches"]
     matched_files = [m["matched_file"] for m in matches if m["matched_file"]]
-    
+
     # 同一个文件可能匹配多个清单项（取决于匹配逻辑）
     # 但每个清单项只能有一个最佳匹配
     for match in matches:
@@ -724,7 +726,7 @@ async def test_completeness_checklist_with_aliases(mock_matcher):
         similarity_threshold=0.75,
         use_semantic=True,
     )
-    
+
     checklist = Checklist(
         id="test_aliases",
         name="测试别名",
@@ -753,7 +755,7 @@ async def test_completeness_checklist_with_aliases(mock_matcher):
             checklist=checklist,
             doc_checks={},
         )
-        
+
         assert result.status == CheckStatus.PASS, f"文件名 '{file_name}' 应通过别名匹配"
         assert result.details["uploaded"] == 1
         assert result.details["missing"] == 0

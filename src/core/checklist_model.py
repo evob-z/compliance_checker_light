@@ -93,7 +93,9 @@ class RequiredDocument(BaseModel):
     )
     required: bool = Field(default=True, description="是否必需")
     validity: Optional[ValidityRule] = Field(default=None, description="有效期规则")
-    compliance_points: List[CompliancePoint] = Field(default_factory=list, description="合规检查要点")
+    compliance_points: List[CompliancePoint] = Field(
+        default_factory=list, description="合规检查要点"
+    )
     checks: List[DocumentCheck] = Field(default_factory=list, description="检查项配置列表")
 
     model_config = ConfigDict(
@@ -104,7 +106,9 @@ class RequiredDocument(BaseModel):
                 "type": ["pdf", "docx"],
                 "required": True,
                 "validity": {"cover_project": True},
-                "compliance_points": [{"point": "公章", "required": True, "check_method": "visual"}],
+                "compliance_points": [
+                    {"point": "公章", "required": True, "check_method": "visual"}
+                ],
             }
         }
     )
@@ -116,9 +120,7 @@ class ProjectPeriod(BaseModel):
     start: Optional[str] = Field(default=None, description="项目开始时间（YYYY-MM格式）")
     end: Optional[str] = Field(default=None, description="项目结束时间（YYYY-MM格式）")
 
-    model_config = ConfigDict(
-        json_schema_extra={"example": {"start": "2025-01", "end": "2027-12"}}
-    )
+    model_config = ConfigDict(json_schema_extra={"example": {"start": "2025-01", "end": "2027-12"}})
 
 
 class Checklist(BaseModel):
@@ -128,7 +130,9 @@ class Checklist(BaseModel):
     name: str = Field(description="清单名称")
     version: str = Field(default="1.0", description="版本号")
     project_period: Optional[ProjectPeriod] = Field(default=None, description="项目周期")
-    required_documents: List[RequiredDocument] = Field(default_factory=list, description="必需文档列表")
+    required_documents: List[RequiredDocument] = Field(
+        default_factory=list, description="必需文档列表"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={

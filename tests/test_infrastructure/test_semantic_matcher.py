@@ -18,7 +18,6 @@ import pytest
 
 from src.infrastructure.llm.semantic_matcher import LLMSemanticMatcher
 
-
 # ============== 环境配置检查 ==============
 
 
@@ -27,7 +26,7 @@ def get_embed_config():
     api_key = os.getenv("EMBED_API_KEY") or os.getenv("LLM_API_KEY")
     base_url = os.getenv("EMBED_BASE_URL") or os.getenv("LLM_BASE_URL")
     model = os.getenv("EMBED_MODEL", "text-embedding-v3")
-    
+
     return {
         "api_key": api_key,
         "base_url": base_url,
@@ -93,7 +92,7 @@ class TestLLMSemanticMatcherInit:
 
 @pytest.mark.skipif(
     not is_embed_available(),
-    reason="嵌入 API 未配置（需要设置 EMBED_API_KEY 或 LLM_API_KEY 环境变量）"
+    reason="嵌入 API 未配置（需要设置 EMBED_API_KEY 或 LLM_API_KEY 环境变量）",
 )
 @pytest.mark.asyncio
 class TestLLMSemanticMatcherRealAPI:
@@ -215,10 +214,7 @@ class TestLLMSemanticMatcherRealAPI:
         )
 
         # 语义相似的文本
-        result = await matcher.get_similarity(
-            "项目立项批复文件",
-            "立项批复"
-        )
+        result = await matcher.get_similarity("项目立项批复文件", "立项批复")
 
         # 相似度应该较高
         assert result > 0.5, f"相似文本相似度 {result} 应该较高"
@@ -238,10 +234,7 @@ class TestLLMSemanticMatcherRealAPI:
         )
 
         # 语义完全不同的文本
-        result = await matcher.get_similarity(
-            "项目立项批复文件",
-            "天气预报今天下雨"
-        )
+        result = await matcher.get_similarity("项目立项批复文件", "天气预报今天下雨")
 
         # 相似度应该较低
         assert result < 0.7, f"不同文本相似度 {result} 应该较低"
@@ -286,8 +279,10 @@ class TestLLMSemanticMatcherRealAPI:
         best_match, _ = await matcher.find_best_match("环评报告", candidates)
 
         # 应该匹配到语义最接近的
-        assert best_match in ["环境评估报告", "环境影响评价"], \
-            f"最佳匹配 '{best_match}' 应该是环境相关的文档"
+        assert best_match in [
+            "环境评估报告",
+            "环境影响评价",
+        ], f"最佳匹配 '{best_match}' 应该是环境相关的文档"
 
     async def test_find_best_match_empty_candidates(self):
         """
@@ -323,8 +318,7 @@ class TestLLMSemanticMatcherRealAPI:
         )
 
         result = await matcher.calculate_similarity(
-            "立项批复",
-            ["项目立项批准文件", "环评报告", "施工许可"]
+            "立项批复", ["项目立项批准文件", "环评报告", "施工许可"]
         )
 
         # 应该返回最高相似度
@@ -405,7 +399,7 @@ class TestLLMSemanticMatcherFallback:
         result = matcher._simple_embedding("test text")
 
         # 计算 L2 范数
-        norm = sum(x ** 2 for x in result) ** 0.5
+        norm = sum(x**2 for x in result) ** 0.5
 
         # 如果向量非零，应该已归一化
         if any(x != 0 for x in result):

@@ -101,10 +101,7 @@ class CheckerRegistry:
         Returns:
             可用检查器名称列表
         """
-        return [
-            name for name, checker in self._checkers.items()
-            if checker.is_available()
-        ]
+        return [name for name, checker in self._checkers.items() if checker.is_available()]
 
     def list_all(self) -> Dict[str, str]:
         """

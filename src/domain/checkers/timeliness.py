@@ -31,13 +31,15 @@ logger = logging.getLogger(__name__)
 
 class ValidityPeriod(NamedTuple):
     """有效期数据结构"""
+
     value: int  # 数值
-    unit: str   # 单位: years, months, days
+    unit: str  # 单位: years, months, days
     is_permanent: bool = False  # 是否长期有效
 
 
 class DateMatch(NamedTuple):
     """日期匹配结果"""
+
     date: datetime
     position: int  # 在文本中的位置
     distance_to_keyword: int  # 距离最近关键词的字符数
@@ -73,25 +75,50 @@ class TimelinessChecker(BaseChecker):
 
     # 日期提取正则模式
     DATE_PATTERNS = [
-        (r"(\d{4})年(\d{1,2})月(\d{1,2})日", "ymd"),      # 2024年3月15日
-        (r"(\d{4})-(\d{2})-(\d{2})", "ymd"),              # 2024-03-15
-        (r"(\d{4})/(\d{2})/(\d{2})", "ymd"),              # 2024/03/15
-        (r"(\d{4})\.(\d{2})\.(\d{2})", "ymd"),            # 2024.03.15
+        (r"(\d{4})年(\d{1,2})月(\d{1,2})日", "ymd"),  # 2024年3月15日
+        (r"(\d{4})-(\d{2})-(\d{2})", "ymd"),  # 2024-03-15
+        (r"(\d{4})/(\d{2})/(\d{2})", "ymd"),  # 2024/03/15
+        (r"(\d{4})\.(\d{2})\.(\d{2})", "ymd"),  # 2024.03.15
     ]
 
     # 关键词列表（用于启发式定位落款日期）
     SIGN_KEYWORDS = [
-        "签发", "日期", "盖章", "签字", "签署", "签章",
-        "批准", "审批", "核准", "审核", "审定",
-        "印发", "发布", "发文", "出具", "开具",
-        "年月日", "签名", "盖章处"
+        "签发",
+        "日期",
+        "盖章",
+        "签字",
+        "签署",
+        "签章",
+        "批准",
+        "审批",
+        "核准",
+        "审核",
+        "审定",
+        "印发",
+        "发布",
+        "发文",
+        "出具",
+        "开具",
+        "年月日",
+        "签名",
+        "盖章处",
     ]
 
     # 中文数字映射
     CHINESE_NUMBERS = {
-        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
-        '百': 100, '千': 1000, '万': 10000
+        "一": 1,
+        "二": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+        "十": 10,
+        "百": 100,
+        "千": 1000,
+        "万": 10000,
     }
 
     def __init__(self, project_period: Optional[Dict[str, str]] = None):
@@ -194,11 +221,11 @@ class TimelinessChecker(BaseChecker):
                     # 验证日期有效性
                     if 1900 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
                         dt = datetime(year, month, day)
-                        dates.append(DateMatch(
-                            date=dt,
-                            position=match.start(),
-                            distance_to_keyword=float('inf')
-                        ))
+                        dates.append(
+                            DateMatch(
+                                date=dt, position=match.start(), distance_to_keyword=float("inf")
+                            )
+                        )
                 except (ValueError, IndexError):
                     continue
         return dates
@@ -214,7 +241,7 @@ class TimelinessChecker(BaseChecker):
         Returns:
             到最近关键词的字符距离（如果没有匹配到任何关键词，返回一个足够大的值）
         """
-        min_distance = float('inf')
+        min_distance = float("inf")
 
         for keyword in self.SIGN_KEYWORDS:
             for match in re.finditer(keyword, text):
@@ -225,7 +252,7 @@ class TimelinessChecker(BaseChecker):
         # 如果没有匹配到任何关键词，返回一个足够大的值（大于阈值）
         # 确保调用方能够正确识别"无关键词"的情况
         KEYWORD_PROXIMITY_THRESHOLD = 500
-        if min_distance == float('inf'):
+        if min_distance == float("inf"):
             return KEYWORD_PROXIMITY_THRESHOLD + 1
 
         return int(min_distance)
@@ -254,17 +281,14 @@ class TimelinessChecker(BaseChecker):
         dated_with_distance = []
         for dm in dates:
             distance = self._find_nearest_keyword_distance(text, dm.position)
-            dated_with_distance.append(DateMatch(
-                date=dm.date,
-                position=dm.position,
-                distance_to_keyword=distance
-            ))
+            dated_with_distance.append(
+                DateMatch(date=dm.date, position=dm.position, distance_to_keyword=distance)
+            )
 
         # 检查是否有日期靠近关键词（距离小于阈值，比如500字符）
         KEYWORD_PROXIMITY_THRESHOLD = 500
         near_keyword_dates = [
-            dm for dm in dated_with_distance
-            if dm.distance_to_keyword < KEYWORD_PROXIMITY_THRESHOLD
+            dm for dm in dated_with_distance if dm.distance_to_keyword < KEYWORD_PROXIMITY_THRESHOLD
         ]
 
         if near_keyword_dates:
@@ -303,7 +327,8 @@ class TimelinessChecker(BaseChecker):
                         continue
                 # 尝试 ISO 格式
                 from datetime import timezone
-                return datetime.fromisoformat(reference_time_str.replace('Z', '+00:00'))
+
+                return datetime.fromisoformat(reference_time_str.replace("Z", "+00:00"))
             except Exception:
                 logger.warning(f"无法解析传入的校验时间: {reference_time_str}，使用当前时间")
 
@@ -334,11 +359,7 @@ class TimelinessChecker(BaseChecker):
         else:
             return sign_date + relativedelta(years=1)  # 默认一年
 
-    def _evaluate_document(
-        self,
-        document: Document,
-        reference_time: datetime
-    ) -> Dict[str, Any]:
+    def _evaluate_document(self, document: Document, reference_time: datetime) -> Dict[str, Any]:
         """
         步骤 4: 核心判定矩阵
 
@@ -373,14 +394,14 @@ class TimelinessChecker(BaseChecker):
             "reference_time": reference_time.strftime("%Y-%m-%d %H:%M:%S"),
             "passed": False,
             "reason": "",
-            "branch": None
+            "branch": None,
         }
 
         if validity:
             result["validity"] = {
                 "value": validity.value,
                 "unit": validity.unit,
-                "is_permanent": validity.is_permanent
+                "is_permanent": validity.is_permanent,
             }
 
         # 格式化日期显示
@@ -406,7 +427,9 @@ class TimelinessChecker(BaseChecker):
         if has_validity and not has_sign_date:
             result["branch"] = "A"
             result["passed"] = False
-            result["reason"] = f"印章时间未提取到，{validity_desc}，晚于当前时间{ref_time_str}，有效期审查未通过。"
+            result["reason"] = (
+                f"印章时间未提取到，{validity_desc}，晚于当前时间{ref_time_str}，有效期审查未通过。"
+            )
             return result
 
         # 分支 B：有落款日期但无有效期（视为长期有效）
@@ -417,10 +440,14 @@ class TimelinessChecker(BaseChecker):
 
             if sign_date <= reference_time:
                 result["passed"] = True
-                result["reason"] = f"印章时间{sign_date_str}，长期有效，早于当前时间{ref_time_str}，有效期审查通过。"
+                result["reason"] = (
+                    f"印章时间{sign_date_str}，长期有效，早于当前时间{ref_time_str}，有效期审查通过。"
+                )
             else:
                 result["passed"] = False
-                result["reason"] = f"印章时间{sign_date_str}，长期有效，晚于当前时间{ref_time_str}，有效期审查未通过。"
+                result["reason"] = (
+                    f"印章时间{sign_date_str}，长期有效，晚于当前时间{ref_time_str}，有效期审查未通过。"
+                )
             return result
 
         # 分支 C：两者都有
@@ -433,16 +460,24 @@ class TimelinessChecker(BaseChecker):
             # 判定条件：落款日期 ≤ 基准时间 ≤ 截止日期
             if sign_date > reference_time:
                 result["passed"] = False
-                result["reason"] = f"印章时间{sign_date_str}，{validity_desc}，晚于当前时间{ref_time_str}，有效期审查未通过。"
+                result["reason"] = (
+                    f"印章时间{sign_date_str}，{validity_desc}，晚于当前时间{ref_time_str}，有效期审查未通过。"
+                )
             elif reference_time > expiry_date:
                 result["passed"] = False
-                result["reason"] = f"印章时间{sign_date_str}，{validity_desc}，早于当前时间{ref_time_str}但已过期（有效期至{expiry_date_str}），有效期审查未通过。"
+                result["reason"] = (
+                    f"印章时间{sign_date_str}，{validity_desc}，早于当前时间{ref_time_str}但已过期（有效期至{expiry_date_str}），有效期审查未通过。"
+                )
             else:
                 result["passed"] = True
                 if validity.is_permanent:
-                    result["reason"] = f"印章时间{sign_date_str}，{validity_desc}，早于当前时间{ref_time_str}，有效期审查通过。"
+                    result["reason"] = (
+                        f"印章时间{sign_date_str}，{validity_desc}，早于当前时间{ref_time_str}，有效期审查通过。"
+                    )
                 else:
-                    result["reason"] = f"印章时间{sign_date_str}，{validity_desc}，早于当前时间{ref_time_str}且在有效期内（至{expiry_date_str}），有效期审查通过。"
+                    result["reason"] = (
+                        f"印章时间{sign_date_str}，{validity_desc}，早于当前时间{ref_time_str}且在有效期内（至{expiry_date_str}），有效期审查通过。"
+                    )
             return result
 
         # 特殊情况：两者都没有
@@ -452,10 +487,7 @@ class TimelinessChecker(BaseChecker):
         return result
 
     async def check(
-        self,
-        documents: List[Document],
-        checklist: Optional[Checklist],
-        config: Dict[str, Any]
+        self, documents: List[Document], checklist: Optional[Checklist], config: Dict[str, Any]
     ) -> CheckResult:
         """
         执行时效性检查
@@ -474,7 +506,7 @@ class TimelinessChecker(BaseChecker):
                 check_type=self.name,
                 status=CheckStatus.PASS,
                 message="没有文档需要检查时效性",
-                details={}
+                details={},
             )
 
         # 步骤 3: 确定基准时间
@@ -498,14 +530,16 @@ class TimelinessChecker(BaseChecker):
                     unclear_count += 1
                 else:
                     failed_count += 1
-                    issues.append({
-                        "type": "timeliness_failed",
-                        "document": doc.name,
-                        "branch": eval_result["branch"],
-                        "reason": eval_result["reason"],
-                        "sign_date": eval_result["sign_date"],
-                        "expiry_date": eval_result["expiry_date"]
-                    })
+                    issues.append(
+                        {
+                            "type": "timeliness_failed",
+                            "document": doc.name,
+                            "branch": eval_result["branch"],
+                            "reason": eval_result["reason"],
+                            "sign_date": eval_result["sign_date"],
+                            "expiry_date": eval_result["expiry_date"],
+                        }
+                    )
 
             # 确定整体状态
             if failed_count > 0:
@@ -522,7 +556,7 @@ class TimelinessChecker(BaseChecker):
                 "failed": failed_count,
                 "unclear": unclear_count,
                 "reference_time": reference_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "documents": document_results
+                "documents": document_results,
             }
 
             # 构建消息
@@ -533,11 +567,7 @@ class TimelinessChecker(BaseChecker):
                 message += f", {unclear_count} 个文档信息不明确"
 
             return CheckResult(
-                check_type=self.name,
-                status=status,
-                message=message,
-                details=details,
-                issues=issues
+                check_type=self.name, status=status, message=message, details=details, issues=issues
             )
 
         except Exception as e:
@@ -546,7 +576,7 @@ class TimelinessChecker(BaseChecker):
                 check_type=self.name,
                 status=CheckStatus.ERROR,
                 message=f"检查执行异常: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def validate_config(self, config: Dict[str, Any]) -> Tuple[bool, str]:

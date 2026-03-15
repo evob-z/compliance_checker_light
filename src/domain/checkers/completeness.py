@@ -128,9 +128,7 @@ class CompletenessChecker(BaseChecker):
 
         return None
 
-    async def match_document(
-        self, file_name: str, required_doc: RequiredDocument
-    ) -> DocumentMatch:
+    async def match_document(self, file_name: str, required_doc: RequiredDocument) -> DocumentMatch:
         """
         匹配单个文档
 
@@ -228,10 +226,7 @@ class CompletenessChecker(BaseChecker):
         total_required = len([d for d in required_docs if d.required])
 
         # 构建缺失文件名列表
-        missing_names = [
-            d.document_name for d in details
-            if d.status == CheckStatus.MISSING
-        ]
+        missing_names = [d.document_name for d in details if d.status == CheckStatus.MISSING]
         missing_names_str = "、".join(missing_names) if missing_names else "无"
 
         if missing_count == 0:

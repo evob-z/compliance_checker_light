@@ -109,6 +109,7 @@ class Container:
             except Exception as e:
                 logger.warning(f"OCR 引擎初始化失败: {e}，将使用无 OCR 模式")
                 from ..infrastructure.llm.ocr_engine import NoOCREngine
+
                 self._ocr_engine = NoOCREngine()
         return self._ocr_engine
 
@@ -202,6 +203,7 @@ def initialize_registry(container: Container) -> CheckerRegistry:
             registry.register(visual_checker)
             # 同时注册 "visual" 别名，确保清单中的 "visual" 检查类型能找到检查器
             from ..core.checker_base import AliasCheckerWrapper
+
             registry.register(AliasCheckerWrapper(visual_checker, "visual"))
             logger.info("视觉检查器注册成功 (compliance + visual)")
         else:
@@ -220,6 +222,7 @@ def initialize_registry(container: Container) -> CheckerRegistry:
             registry.register(visual_checker)
             # 同时注册 "visual" 别名
             from ..core.checker_base import AliasCheckerWrapper
+
             registry.register(AliasCheckerWrapper(visual_checker, "visual"))
     except Exception as e:
         logger.error(f"视觉检查器注册失败: {e}")

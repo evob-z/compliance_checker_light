@@ -59,9 +59,7 @@ class LLMClient(LLMClientProtocol):
             max_retries=config.max_retries,
         )
 
-    async def complete(
-        self, prompt: str, temperature: float = 0.3, max_tokens: int = 2000
-    ) -> str:
+    async def complete(self, prompt: str, temperature: float = 0.3, max_tokens: int = 2000) -> str:
         """
         调用 LLM 完成文本生成
 

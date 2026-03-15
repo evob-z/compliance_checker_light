@@ -21,7 +21,6 @@ from src.infrastructure.llm.client import LLMClient, _has_openai
 from src.infrastructure.llm.config import LLMConfig
 from src.core.exceptions import CheckExecutionError
 
-
 # ============== 环境配置检查 ==============
 
 
@@ -30,7 +29,7 @@ def get_llm_config() -> LLMConfig:
     api_key = os.getenv("LLM_API_KEY", "")
     base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
     model = os.getenv("LLM_MODEL", "gpt-4o")
-    
+
     return LLMConfig(
         api_key=api_key,
         base_url=base_url,
@@ -44,7 +43,7 @@ def is_llm_available() -> bool:
     """检查 LLM API 是否可用"""
     if not _has_openai:
         return False
-    
+
     config = get_llm_config()
     return bool(config.api_key)
 
@@ -64,6 +63,7 @@ class TestLLMClientPrerequisites:
         - openai 包可以导入
         """
         import openai
+
         assert openai is not None
 
 
@@ -89,9 +89,9 @@ class TestLLMClientInit:
             timeout=60,
             max_retries=3,
         )
-        
+
         client = LLMClient(config=config)
-        
+
         assert client.config is config
 
     def test_init_with_empty_api_key(self):
@@ -102,9 +102,9 @@ class TestLLMClientInit:
         - 允许空 API key 初始化（实际调用时会失败）
         """
         config = LLMConfig(api_key="", base_url="https://test.api.com")
-        
+
         client = LLMClient(config=config)
-        
+
         assert client.config.api_key == ""
 
 
@@ -112,8 +112,7 @@ class TestLLMClientInit:
 
 
 @pytest.mark.skipif(
-    not is_llm_available(),
-    reason="LLM API 未配置（需要设置 LLM_API_KEY 环境变量）"
+    not is_llm_available(), reason="LLM API 未配置（需要设置 LLM_API_KEY 环境变量）"
 )
 @pytest.mark.asyncio
 class TestLLMClientRealAPI:
@@ -129,9 +128,9 @@ class TestLLMClientRealAPI:
         """
         config = get_llm_config()
         client = LLMClient(config=config)
-        
+
         result = await client.complete("请回复：测试成功")
-        
+
         assert isinstance(result, str), "返回结果应该是字符串"
         assert len(result) > 0, "返回内容不应为空"
         # 验证返回了有意义的内容（不只是空白）
@@ -147,9 +146,9 @@ class TestLLMClientRealAPI:
         """
         config = get_llm_config()
         client = LLMClient(config=config)
-        
+
         result = await client.complete("1+1等于几？只回答数字。")
-        
+
         assert isinstance(result, str)
         # 回答应该包含 "2"
         assert "2" in result, f"回答 '{result}' 应该包含 '2'"
@@ -163,13 +162,13 @@ class TestLLMClientRealAPI:
         """
         config = get_llm_config()
         client = LLMClient(config=config)
-        
+
         # 低 temperature 多次调用应该产生相似结果
         results = []
         for _ in range(2):
             result = await client.complete("说一个1到10之间的数字", temperature=0.1)
             results.append(result)
-        
+
         # 验证都返回了内容
         for r in results:
             assert len(r.strip()) > 0
@@ -184,7 +183,7 @@ class TestLLMClientRealAPI:
         """
         config = get_llm_config()
         client = LLMClient(config=config)
-        
+
         prompt = """
 请生成一个简单的检查清单，格式如下：
 ```yaml
@@ -197,9 +196,9 @@ checklist:
 ```
 只返回 YAML 内容。
 """
-        
+
         result = await client.generate_yaml(prompt)
-        
+
         assert isinstance(result, dict), "返回结果应该是字典"
         assert "checklist" in result, "应该包含 checklist 根节点"
         assert isinstance(result["checklist"], dict)
@@ -213,7 +212,7 @@ checklist:
         """
         config = get_llm_config()
         client = LLMClient(config=config)
-        
+
         prompt = """
 生成一个项目审批检查清单：
 ```yaml
@@ -228,13 +227,13 @@ checklist:
 ```
 只返回 YAML。
 """
-        
+
         result = await client.generate_yaml(prompt)
-        
+
         # 验证结构
         assert "checklist" in result
         checklist = result["checklist"]
-        
+
         # 应该有某些字段（具体字段名可能不同）
         assert len(checklist) > 0, "checklist 不应为空"
 
@@ -248,12 +247,12 @@ checklist:
         """
         config = get_llm_config()
         client = LLMClient(config=config)
-        
+
         result = await client.complete("请用中文说：你好世界")
-        
+
         assert isinstance(result, str)
         # 应该包含中文
-        assert any('\u4e00' <= c <= '\u9fff' for c in result), "应该包含中文字符"
+        assert any("\u4e00" <= c <= "\u9fff" for c in result), "应该包含中文字符"
 
 
 # ============== 错误处理测试（真实场景） ==============
@@ -279,13 +278,15 @@ class TestLLMClientErrorHandling:
             max_retries=1,
         )
         client = LLMClient(config=config)
-        
+
         with pytest.raises(CheckExecutionError) as exc_info:
             await client.complete("测试")
-        
+
         # 错误消息应该包含认证相关信息
         error_msg = str(exc_info.value).lower()
-        assert "认证" in error_msg or "auth" in error_msg or "api" in error_msg or "key" in error_msg
+        assert (
+            "认证" in error_msg or "auth" in error_msg or "api" in error_msg or "key" in error_msg
+        )
 
     async def test_complete_with_invalid_base_url(self):
         """
@@ -302,7 +303,7 @@ class TestLLMClientErrorHandling:
             max_retries=1,
         )
         client = LLMClient(config=config)
-        
+
         with pytest.raises(CheckExecutionError):
             await client.complete("测试")
 
@@ -322,10 +323,10 @@ class TestLLMClientCleanYamlContent:
         """
         config = LLMConfig(api_key="test-key")
         client = LLMClient(config=config)
-        
+
         content = "checklist:\n  version: '1.0'"
         result = client._clean_yaml_content(content)
-        
+
         assert result == content
 
     def test_clean_yaml_with_yaml_marker(self):
@@ -338,10 +339,10 @@ class TestLLMClientCleanYamlContent:
         """
         config = LLMConfig(api_key="test-key")
         client = LLMClient(config=config)
-        
+
         content = "```yaml\nchecklist:\n  version: '1.0'\n```"
         result = client._clean_yaml_content(content)
-        
+
         assert "```yaml" not in result
         assert "```" not in result
         assert "checklist:" in result
@@ -355,10 +356,10 @@ class TestLLMClientCleanYamlContent:
         """
         config = LLMConfig(api_key="test-key")
         client = LLMClient(config=config)
-        
+
         content = "```\nchecklist:\n  version: '1.0'\n```"
         result = client._clean_yaml_content(content)
-        
+
         assert "```" not in result
         assert "checklist:" in result
 
@@ -371,10 +372,10 @@ class TestLLMClientCleanYamlContent:
         """
         config = LLMConfig(api_key="test-key")
         client = LLMClient(config=config)
-        
+
         content = "\n\n```yaml\nchecklist:\n  version: '1.0'\n```\n\n"
         result = client._clean_yaml_content(content)
-        
+
         assert result.strip() == "checklist:\n  version: '1.0'"
 
 
@@ -392,7 +393,7 @@ class TestLLMConfig:
         - 默认值正确设置
         """
         config = LLMConfig(api_key="test-key")
-        
+
         assert config.base_url == "https://api.openai.com/v1"
         assert config.model == "gpt-4o"
         assert config.timeout == 60
@@ -412,7 +413,7 @@ class TestLLMConfig:
             timeout=120,
             max_retries=5,
         )
-        
+
         assert config.api_key == "custom-key"
         assert config.base_url == "https://custom.api.com"
         assert config.model == "custom-model"

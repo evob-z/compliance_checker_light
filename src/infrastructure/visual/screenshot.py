@@ -54,9 +54,7 @@ def capture_page(
 
     try:
         if page_num >= len(doc):
-            raise DocumentParseError(
-                f"Page {page_num} not found, document has {len(doc)} pages"
-            )
+            raise DocumentParseError(f"Page {page_num} not found, document has {len(doc)} pages")
 
         page = doc[page_num]
 

@@ -57,9 +57,7 @@ class PyMuPDFConverter(PDFConverterProtocol):
         try:
             import fitz  # PyMuPDF
         except ImportError as e:
-            raise ImportError(
-                "PyMuPDF (fitz) 未安装，请运行: pip install pymupdf"
-            ) from e
+            raise ImportError("PyMuPDF (fitz) 未安装，请运行: pip install pymupdf") from e
 
         images = []
 
@@ -120,9 +118,7 @@ class PyMuPDFConverter(PDFConverterProtocol):
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    self._convert_sync_impl, file_path_or_bytes
-                )
+                future = pool.submit(self._convert_sync_impl, file_path_or_bytes)
                 return future.result()
         except RuntimeError:
             # 不在事件循环中，直接调用

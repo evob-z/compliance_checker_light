@@ -18,18 +18,20 @@ logger = logging.getLogger(__name__)
 
 class VisualAPIError(ComplianceCheckerError):
     """视觉 API 调用错误"""
+
     pass
 
 
 class ImageReadError(ComplianceCheckerError):
     """图片读取错误"""
+
     pass
 
 
 class QwenVLClient(VisualCheckerProtocol):
     """
     视觉模型客户端 - 实现 VisualCheckerProtocol
-    
+
     默认使用 Qwen3-VL-Flash (OpenAI 兼容模式)
     只负责调用 API 并返回原始检测结果，不做业务判断。
     """
@@ -99,9 +101,7 @@ class QwenVLClient(VisualCheckerProtocol):
         """
         return self.api_key is not None and len(self.api_key) > 0
 
-    async def detect_seal(
-        self, image_path: str, context: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def detect_seal(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
         """
         检测图片中的公章
 
@@ -225,9 +225,7 @@ class QwenVLClient(VisualCheckerProtocol):
         result = await self._chat_with_bytes(image_bytes, context)
         return self._format_detection_result(result, "signature")
 
-    async def _chat(
-        self, image_path: str, prompt: str, temperature: float = 0.7
-    ) -> Dict[str, Any]:
+    async def _chat(self, image_path: str, prompt: str, temperature: float = 0.7) -> Dict[str, Any]:
         """
         发送图片和提示词到视觉模型
 
@@ -461,7 +459,7 @@ class QwenVLClient(VisualCheckerProtocol):
     def _extract_content_from_response(self, result: Dict[str, Any]) -> Optional[str]:
         """
         从 API 响应中提取内容文本
-        
+
         支持 OpenAI 兼容格式和阿里云原生格式
         """
         try:
@@ -607,7 +605,16 @@ class QwenVLClient(VisualCheckerProtocol):
 
         # 提取位置（简单实现）
         location = ""
-        location_keywords = ["右下角", "左下角", "右上角", "左上角", "中央", "底部", "顶部", "页面中央"]
+        location_keywords = [
+            "右下角",
+            "左下角",
+            "右上角",
+            "左上角",
+            "中央",
+            "底部",
+            "顶部",
+            "页面中央",
+        ]
         for kw in location_keywords:
             if kw in content:
                 location = kw

@@ -28,7 +28,6 @@ from src.infrastructure.visual.screenshot import (
 )
 from src.core.exceptions import DocumentParseError
 
-
 # ============== 测试 Fixtures ==============
 
 
@@ -77,14 +76,14 @@ class TestCapturePage:
         - 文件是有效的 PNG 图片
         """
         result = capture_page(str(sample_pdf_path), page_num=0)
-        
+
         # 验证返回路径存在
         result_path = Path(result)
         assert result_path.exists(), f"截图文件不存在: {result}"
-        
+
         # 验证文件是 PNG 格式
         assert result_path.suffix == ".png"
-        
+
         # 验证文件大小大于 0（实际读到了内容）
         assert result_path.stat().st_size > 0, "截图文件大小为 0，未读到内容"
 
@@ -97,9 +96,9 @@ class TestCapturePage:
         - 图片尺寸大于 0
         """
         from PIL import Image
-        
+
         result = capture_page(str(sample_pdf_path), page_num=0)
-        
+
         # 使用 Pillow 打开图片验证
         img = Image.open(result)
         try:
@@ -121,13 +120,9 @@ class TestCapturePage:
         - 文件保存到指定路径
         """
         output_path = tmp_path / "custom_screenshot.png"
-        
-        result = capture_page(
-            str(sample_pdf_path),
-            page_num=0,
-            output_path=str(output_path)
-        )
-        
+
+        result = capture_page(str(sample_pdf_path), page_num=0, output_path=str(output_path))
+
         assert result == str(output_path)
         assert output_path.exists()
         assert output_path.stat().st_size > 0
@@ -140,13 +135,13 @@ class TestCapturePage:
         - DPI 参数影响输出图片尺寸
         """
         from PIL import Image
-        
+
         output_low = tmp_path / "low_dpi.png"
         output_high = tmp_path / "high_dpi.png"
-        
+
         capture_page(str(sample_pdf_path), page_num=0, dpi=72, output_path=str(output_low))
         capture_page(str(sample_pdf_path), page_num=0, dpi=300, output_path=str(output_high))
-        
+
         with Image.open(output_low) as img_low:
             with Image.open(output_high) as img_high:
                 # 高 DPI 图片尺寸应该更大
@@ -162,17 +157,12 @@ class TestCapturePage:
         - 输出图片尺寸符合预期
         """
         from PIL import Image
-        
+
         output_path = tmp_path / "cropped.png"
         bbox = (50, 50, 200, 200)
-        
-        capture_page(
-            str(sample_pdf_path),
-            page_num=0,
-            bbox=bbox,
-            output_path=str(output_path)
-        )
-        
+
+        capture_page(str(sample_pdf_path), page_num=0, bbox=bbox, output_path=str(output_path))
+
         with Image.open(output_path) as img:
             # 裁剪后的图片尺寸应该接近 bbox 尺寸（考虑 DPI 缩放）
             width, height = img.size
@@ -187,7 +177,7 @@ class TestCapturePage:
         """
         with pytest.raises(DocumentParseError) as exc_info:
             capture_page(str(sample_pdf_path), page_num=999)
-        
+
         assert "not found" in str(exc_info.value).lower() or "未找到" in str(exc_info.value)
 
     def test_capture_page_nonexistent_file(self):
@@ -217,7 +207,7 @@ class TestCaptureFullPageBase64:
         - 字符串长度大于 0
         """
         result = capture_full_page_base64(str(sample_pdf_path), page_num=0)
-        
+
         assert isinstance(result, str)
         assert len(result) > 0, "base64 字符串长度为 0，未读到内容"
 
@@ -229,15 +219,15 @@ class TestCaptureFullPageBase64:
         - 可以解码为有效的图片数据
         """
         result = capture_full_page_base64(str(sample_pdf_path), page_num=0)
-        
+
         # 解码 base64
         image_bytes = base64.b64decode(result)
-        
+
         # 验证解码后的数据是有效的 PNG
         assert len(image_bytes) > 0, "解码后的图片数据为空"
-        
+
         # PNG 文件头
-        assert image_bytes[:8] == b'\x89PNG\r\n\x1a\n', "解码后的数据不是有效的 PNG"
+        assert image_bytes[:8] == b"\x89PNG\r\n\x1a\n", "解码后的数据不是有效的 PNG"
 
     def test_capture_full_page_base64_can_open_as_image(self, sample_pdf_path: Path):
         """
@@ -248,10 +238,10 @@ class TestCaptureFullPageBase64:
         """
         from PIL import Image
         import io
-        
+
         result = capture_full_page_base64(str(sample_pdf_path), page_num=0)
         image_bytes = base64.b64decode(result)
-        
+
         with Image.open(io.BytesIO(image_bytes)) as img:
             assert img.size[0] > 0
             assert img.size[1] > 0
@@ -274,7 +264,7 @@ class TestCaptureRegionBase64:
         """
         bbox = (50, 50, 200, 200)
         result = capture_region_base64(str(sample_pdf_path), page_num=0, bbox=bbox)
-        
+
         assert isinstance(result, str)
         assert len(result) > 0, "base64 字符串长度为 0，未读到内容"
 
@@ -287,10 +277,10 @@ class TestCaptureRegionBase64:
         """
         bbox = (50, 50, 200, 200)
         result = capture_region_base64(str(sample_pdf_path), page_num=0, bbox=bbox)
-        
+
         image_bytes = base64.b64decode(result)
         assert len(image_bytes) > 0
-        assert image_bytes[:8] == b'\x89PNG\r\n\x1a\n', "解码后的数据不是有效的 PNG"
+        assert image_bytes[:8] == b"\x89PNG\r\n\x1a\n", "解码后的数据不是有效的 PNG"
 
 
 # ============== get_page_size 测试 ==============
@@ -309,7 +299,7 @@ class TestGetPageSize:
         - 长度为 2
         """
         result = get_page_size(str(sample_pdf_path), page_num=0)
-        
+
         assert isinstance(result, tuple)
         assert len(result) == 2
 
@@ -321,7 +311,7 @@ class TestGetPageSize:
         - 宽度和高度都是正整数
         """
         width, height = get_page_size(str(sample_pdf_path), page_num=0)
-        
+
         assert isinstance(width, int)
         assert isinstance(height, int)
         assert width > 0, f"页面宽度 {width} 不是正数"
@@ -335,7 +325,7 @@ class TestGetPageSize:
         - dummy_approval.pdf 是 A4 尺寸，约 595 x 842 points
         """
         width, height = get_page_size(str(sample_pdf_path), page_num=0)
-        
+
         # A4 尺寸允许一定误差
         assert 500 < width < 700, f"页面宽度 {width} 不在合理范围内"
         assert 750 < height < 900, f"页面高度 {height} 不在合理范围内"
@@ -366,7 +356,7 @@ class TestGetPageCount:
         - 返回类型是 int
         """
         result = get_page_count(str(sample_pdf_path))
-        
+
         assert isinstance(result, int)
 
     def test_get_page_count_positive_value(self, sample_pdf_path: Path):
@@ -377,7 +367,7 @@ class TestGetPageCount:
         - 页数大于 0
         """
         result = get_page_count(str(sample_pdf_path))
-        
+
         assert result > 0, f"页数 {result} 不是正数"
 
     def test_get_page_count_correct_value(self, sample_pdf_path: Path):
@@ -388,7 +378,7 @@ class TestGetPageCount:
         - dummy_approval.pdf 有 1 页
         """
         result = get_page_count(str(sample_pdf_path))
-        
+
         # dummy_approval.pdf 是单页文档
         assert result >= 1, f"页数 {result} 应该至少为 1"
 
@@ -418,19 +408,20 @@ class TestWithoutPyMuPDF:
         """
         # 临时禁用 HAS_FITZ
         import src.infrastructure.visual.screenshot as screenshot_module
+
         original_has_fitz = screenshot_module.HAS_FITZ
-        
+
         try:
             screenshot_module.HAS_FITZ = False
-            
+
             with pytest.raises(DocumentParseError):
                 capture_page(str(sample_pdf_path))
-            
+
             with pytest.raises(DocumentParseError):
                 get_page_size(str(sample_pdf_path))
-            
+
             with pytest.raises(DocumentParseError):
                 get_page_count(str(sample_pdf_path))
-                
+
         finally:
             screenshot_module.HAS_FITZ = original_has_fitz

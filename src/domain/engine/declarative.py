@@ -214,9 +214,7 @@ class DeclarativeCheckEngine:
 
         # 处理项目级别的检查（completeness）
         if "completeness" in all_check_types:
-            completeness_task = self._create_project_level_task(
-                doc_checks_map, checklist
-            )
+            completeness_task = self._create_project_level_task(doc_checks_map, checklist)
             if completeness_task:
                 tasks.append(completeness_task)
 
