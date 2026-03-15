@@ -209,8 +209,8 @@ async def test_completeness_all_documents_present(checker, sample_checklist):
     # 验证 message 字段
     assert isinstance(result.message, str), "message 应为字符串类型"
     assert len(result.message) > 0, "message 不应为空"
-    assert "所有" in result.message, "message 应包含 '所有'"
-    assert "已上传" in result.message, "message 应包含 '已上传'"
+    assert "完整审查情况" in result.message, "message 应包含 '完整审查情况'"
+    assert "无缺少" in result.message, "message 应包含 '无缺少'"
 
     # 验证 details 字段结构
     assert isinstance(result.details, dict), "details 应为字典类型"

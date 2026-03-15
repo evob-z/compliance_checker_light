@@ -474,8 +474,7 @@ class TestFormatIssuesDescription:
         # 验证检查类型被正确映射为中文
         assert "完整性检查" in description
         assert "时效性检查" in description
-        assert "合规性检查" in description
-        assert "视觉检查" in description
+        assert "合规性/视觉检查" in description
 
     def test_description_project_level_display(self):
         """测试项目级别显示名称"""
