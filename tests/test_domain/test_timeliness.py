@@ -21,7 +21,6 @@ from src.core.checker_base import CheckStatus, CheckResult
 from src.core.document import Document, DocumentMetadata, PageContent
 from src.domain.checkers.timeliness import TimelinessChecker, ValidityPeriod, DateMatch
 
-
 # ============== 辅助函数 ==============
 
 
@@ -414,7 +413,7 @@ async def test_evaluate_document_branch_a_validity_no_sign_date(checker):
     预期结果：
     - passed 为 False
     - branch 为 "A"
-    - reason 包含 "缺失印章/签发日期"
+    - reason 包含 "印章时间未提取到" 和 "有效期审查未通过"
     """
     doc = create_document_with_content(
         "测试文档.pdf",
@@ -428,7 +427,9 @@ async def test_evaluate_document_branch_a_validity_no_sign_date(checker):
     assert result["passed"] is False
     assert result["has_validity"] is True
     assert result["has_sign_date"] is False
-    assert "缺失印章/签发日期" in result["reason"]
+    assert "印章时间未提取到" in result["reason"]
+    assert "有效期1年" in result["reason"]
+    assert "有效期审查未通过" in result["reason"]
 
 
 @pytest.mark.asyncio
@@ -455,8 +456,10 @@ async def test_evaluate_document_branch_b_sign_date_no_validity_passed(checker):
     assert result["has_sign_date"] is True
     assert result["sign_date"] == "2024-03-15"
     assert result["validity"]["is_permanent"] is True
-    assert "已生效" in result["reason"]
+    assert "印章时间2024-03-15" in result["reason"]
     assert "长期有效" in result["reason"]
+    assert "早于当前时间2024-06-15" in result["reason"]
+    assert "有效期审查通过" in result["reason"]
 
 
 @pytest.mark.asyncio
@@ -467,7 +470,7 @@ async def test_evaluate_document_branch_b_sign_date_no_validity_not_yet(checker)
     预期结果：
     - passed 为 False
     - branch 为 "B"
-    - reason 包含 "尚未生效"
+    - reason 包含 "晚于当前时间" 和 "有效期审查未通过"
     """
     doc = create_document_with_content(
         "测试文档.pdf",
@@ -479,7 +482,10 @@ async def test_evaluate_document_branch_b_sign_date_no_validity_not_yet(checker)
 
     assert result["branch"] == "B"
     assert result["passed"] is False
-    assert "尚未生效" in result["reason"]
+    assert "印章时间2025-03-15" in result["reason"]
+    assert "长期有效" in result["reason"]
+    assert "晚于当前时间2024-06-15" in result["reason"]
+    assert "有效期审查未通过" in result["reason"]
 
 
 @pytest.mark.asyncio
@@ -506,7 +512,11 @@ async def test_evaluate_document_branch_c_both_valid_passed(checker):
     assert result["has_sign_date"] is True
     assert result["sign_date"] == "2024-03-15"
     assert result["expiry_date"] == "2025-03-15"  # 1年后
-    assert "已生效" in result["reason"]
+    assert "印章时间2024-03-15" in result["reason"]
+    assert "有效期1年" in result["reason"]
+    assert "早于当前时间2024-06-15" in result["reason"]
+    assert "在有效期内（至2025-03-15）" in result["reason"]
+    assert "有效期审查通过" in result["reason"]
 
 
 @pytest.mark.asyncio
@@ -516,7 +526,7 @@ async def test_evaluate_document_branch_c_not_yet_effective(checker):
 
     预期结果：
     - passed 为 False
-    - reason 包含 "尚未生效"
+    - reason 包含 "晚于当前时间" 和 "有效期审查未通过"
     """
     doc = create_document_with_content(
         "测试文档.pdf",
@@ -528,7 +538,10 @@ async def test_evaluate_document_branch_c_not_yet_effective(checker):
 
     assert result["branch"] == "C"
     assert result["passed"] is False
-    assert "尚未生效" in result["reason"]
+    assert "印章时间2025-03-15" in result["reason"]
+    assert "有效期1年" in result["reason"]
+    assert "晚于当前时间2024-06-15" in result["reason"]
+    assert "有效期审查未通过" in result["reason"]
 
 
 @pytest.mark.asyncio
@@ -538,7 +551,7 @@ async def test_evaluate_document_branch_c_expired(checker):
 
     预期结果：
     - passed 为 False
-    - reason 包含 "已过期"
+    - reason 包含 "已过期" 和 "有效期审查未通过"
     """
     doc = create_document_with_content(
         "测试文档.pdf",
@@ -550,8 +563,11 @@ async def test_evaluate_document_branch_c_expired(checker):
 
     assert result["branch"] == "C"
     assert result["passed"] is False
-    assert "已过期" in result["reason"]
     assert result["expiry_date"] == "2024-01-15"
+    assert "印章时间2023-01-15" in result["reason"]
+    assert "有效期1年" in result["reason"]
+    assert "早于当前时间2024-06-15但已过期（有效期至2024-01-15）" in result["reason"]
+    assert "有效期审查未通过" in result["reason"]
 
 
 @pytest.mark.asyncio
@@ -561,7 +577,7 @@ async def test_evaluate_document_branch_c_permanent_valid(checker):
 
     预期结果：
     - passed 为 True
-    - reason 包含 "长期有效"
+    - reason 包含 "长期有效" 和 "有效期审查通过"
     """
     doc = create_document_with_content(
         "测试文档.pdf",
@@ -574,7 +590,10 @@ async def test_evaluate_document_branch_c_permanent_valid(checker):
     assert result["branch"] == "C"
     assert result["passed"] is True
     assert result["validity"]["is_permanent"] is True
+    assert "印章时间2024-03-15" in result["reason"]
     assert "长期有效" in result["reason"]
+    assert "早于当前时间2024-06-15" in result["reason"]
+    assert "有效期审查通过" in result["reason"]
 
 
 @pytest.mark.asyncio
@@ -585,7 +604,7 @@ async def test_evaluate_document_branch_none_no_info(checker):
     预期结果：
     - branch 为 "NONE"
     - passed 为 False
-    - reason 包含 "无法提取"
+    - reason 包含 "印章时间未提取到" 和 "无法完成时效性审查"
     """
     doc = create_document_with_content(
         "测试文档.pdf",
@@ -599,7 +618,9 @@ async def test_evaluate_document_branch_none_no_info(checker):
     assert result["passed"] is False
     assert result["has_validity"] is False
     assert result["has_sign_date"] is False
-    assert "无法提取" in result["reason"]
+    assert "印章时间未提取到" in result["reason"]
+    assert "有效期信息缺失" in result["reason"]
+    assert "无法完成时效性审查" in result["reason"]
 
 
 # ============== 日期计算测试 ==============
