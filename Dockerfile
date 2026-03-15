@@ -39,19 +39,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件
-COPY requirements.txt .
+# 复制项目配置文件
+COPY pyproject.toml .
+COPY README.md .
 
-# 安装基础依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 安装基础依赖（使用 pyproject.toml）
+RUN pip install --no-cache-dir -e .
 
 # 根据 OCR_BACKEND 参数条件安装 OCR 依赖
 RUN if [ "${OCR_BACKEND}" = "local" ]; then \
         echo "Installing PaddleOCR (local OCR)..." && \
-        pip install --no-cache-dir "paddleocr>=2.7.0" "paddlepaddle>=2.5.0"; \
+        pip install --no-cache-dir -e ".[local-ocr]"; \
     elif [ "${OCR_BACKEND}" = "cloud" ]; then \
         echo "Installing Aliyun OCR (cloud OCR)..." && \
-        pip install --no-cache-dir "alibabacloud_ocr_api20210707>=1.0.0" "alibabacloud-tea-openapi>=0.3.0"; \
+        pip install --no-cache-dir -e ".[cloud-ocr]"; \
     else \
         echo "OCR disabled (minimal image)"; \
     fi
@@ -71,4 +72,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import compliance_checker" || exit 1
 
 # 默认启动命令
-CMD ["python", "-m", "compliance_checker.server"]
+CMD ["compliance-checker"]
