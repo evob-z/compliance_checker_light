@@ -3,6 +3,7 @@
 # =============================================================================
 # 触发时机:
 #   - Release 发布完成后 (workflow_run)
+#   - 手动触发 (workflow_dispatch)
 #
 # 职责:
 #   - 构建三种镜像变体 (base/local-ocr/cloud-ocr)
@@ -18,6 +19,12 @@ on:
     workflows: ["Release"]
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如 v1.0.0)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -30,7 +37,7 @@ jobs:
   build-base:
     name: Build Base Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -38,11 +45,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get version from tag
+      - name: Get version
         id: version
         run: |
-          # 从 release 工作流获取版本号
-          VERSION=${{ github.event.workflow_run.head_branch }}
+          # 优先使用手动输入的版本号，否则从 release 工作流获取
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # 从 GitHub API 获取最新 release 的 tag_name
+            VERSION=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+              jq -r '.tag_name // empty')
+          fi
+          
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not determine version" >&2
+            exit 1
+          fi
+          
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
@@ -63,7 +83,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.version.outputs.VERSION }}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' }}
 
       - name: Build and push (Base - No OCR)
         uses: docker/build-push-action@v5
@@ -83,7 +103,7 @@ jobs:
   build-local-ocr:
     name: Build Local OCR Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -91,11 +111,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get version from tag
+      - name: Get version
         id: version
         run: |
-          VERSION=${{ github.event.workflow_run.head_branch }}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+              jq -r '.tag_name // empty')
+          fi
+          
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not determine version" >&2
+            exit 1
+          fi
+          
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -114,7 +147,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.version.outputs.VERSION }}-local-ocr
-            type=raw,value=local-ocr-latest,enable={{is_default_branch}}
+            type=raw,value=local-ocr-latest,enable=${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' }}
 
       - name: Build and push (Local OCR)
         uses: docker/build-push-action@v5
@@ -134,7 +167,7 @@ jobs:
   build-cloud-ocr:
     name: Build Cloud OCR Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -142,11 +175,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get version from tag
+      - name: Get version
         id: version
         run: |
-          VERSION=${{ github.event.workflow_run.head_branch }}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+              jq -r '.tag_name // empty')
+          fi
+          
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not determine version" >&2
+            exit 1
+          fi
+          
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -165,7 +211,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.version.outputs.VERSION }}-cloud-ocr
-            type=raw,value=cloud-ocr-latest,enable={{is_default_branch}}
+            type=raw,value=cloud-ocr-latest,enable=${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' }}
 
       - name: Build and push (Cloud OCR)
         uses: docker/build-push-action@v5
@@ -186,14 +232,24 @@ jobs:
     name: Update Release Notes
     needs: [build-base, build-local-ocr, build-cloud-ocr]
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_run' }}
     permissions:
       contents: write
     steps:
       - name: Get version
         id: version
         run: |
-          VERSION=${{ github.event.workflow_run.head_branch }}
+          VERSION=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+            jq -r '.tag_name // empty')
+          
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not determine version" >&2
+            exit 1
+          fi
+          
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Updating release: $VERSION"
 
       - name: Update release with image info
         uses: softprops/action-gh-release@v1

@@ -31,17 +31,18 @@ WORKDIR /app
 # 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
-    libxrender-dev \
+    libxrender1 \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制项目配置文件
+# 复制项目配置文件和源代码
 COPY pyproject.toml .
 COPY README.md .
+COPY src/ ./src/
 
 # 安装基础依赖（使用 pyproject.toml）
 RUN pip install --no-cache-dir -e .
@@ -57,8 +58,7 @@ RUN if [ "${OCR_BACKEND}" = "local" ]; then \
         echo "OCR disabled (minimal image)"; \
     fi
 
-# 复制应用代码
-COPY src/ ./src/
+# 复制环境配置示例
 COPY .env.example .
 
 # 设置 Python 路径
