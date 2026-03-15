@@ -53,71 +53,57 @@ graph TD
 
 ## 项目结构
 
+本项目采用 Clean Architecture 五层架构：
+
 ```
-compliance-checker/
-├── src/compliance_checker/          # 源代码
-│   ├── __init__.py
-│   ├── server.py                    # MCP Server 入口
-│   ├── skill.py                     # Skill 主模块（自然语言接口）
-│   ├── skill_formatter.py           # 结果格式化
-│   ├── core/                        # 核心数据模型
-│   │   ├── __init__.py
-│   │   ├── checker_base.py          # 检查器基类
-│   │   ├── checker_registry.py      # 检查器注册表
-│   │   ├── document.py              # 文档数据模型
-│   │   ├── checklist_model.py       # 清单数据模型
-│   │   └── result_model.py          # 结果数据模型
-│   ├── checkers/                    # 检查器实现
-│   │   ├── __init__.py
-│   │   ├── completeness_checker.py  # 完整性检查器
-│   │   ├── timeliness_checker.py    # 时效性检查器
-│   │   ├── compliance_checker.py    # 合规性检查器
-│   │   └── visual_checker.py        # 视觉检查器
-│   ├── engine/                      # 声明式执行引擎
-│   │   ├── __init__.py
-│   │   └── declarative_engine.py    # 声明式检查引擎
-│   ├── llm/                         # LLM 客户端
-│   │   ├── __init__.py
-│   │   ├── client.py                # OpenAI 兼容客户端
-│   │   └── config.py                # LLM 配置
-│   ├── parsers/                     # 文档解析器
-│   │   ├── __init__.py
-│   │   ├── pdf_parser.py            # PDF 解析
-│   │   ├── ocr_engine.py            # OCR 引擎
-│   │   └── docx_parser.py           # Word 解析
-│   ├── prompts/                     # LLM 提示词
-│   │   └── checklist_generator.py   # 清单生成提示词
-│   ├── tools/                       # MCP 工具实现
-│   │   ├── __init__.py
-│   │   ├── checklist.py             # load_checklist
-│   │   ├── parser.py                # parse_documents
-│   │   ├── completeness.py          # check_completeness
-│   │   ├── timeliness.py            # check_timeliness
-│   │   ├── compliance.py            # check_compliance
-│   │   ├── visual.py                # visual_inspection
-│   │   └── report.py                # generate_report（已废弃）
-│   ├── visual/                      # 视觉检测模块
-│   │   ├── __init__.py
-│   │   ├── qwen_client.py           # Qwen-VL API 封装
-│   │   ├── region_detector.py       # OCR 区域定位
-│   │   └── screenshot.py            # PDF 截图工具
-│   └── report/                      # 报告生成（已移除）
-│       └── __init__.py              # 占位符
+src/compliance_checker/
+├── interface/                    # 接口层 - MCP 协议适配
+│   └── mcp_server.py            # MCP Server 入口
 │
-├── docs/                            # 示例文档
-│   └── 发票.pdf                      # 测试用发票
+├── application/                  # 应用层 - 用例编排
+│   ├── skill.py                 # Skill Facade（对外接口）
+│   ├── bootstrap.py             # 依赖注入初始化
+│   ├── formatter.py             # 结果格式化
+│   ├── use_cases/               # 用例实现
+│   │   └── project_check.py     # 项目检查用例
+│   └── prompts/                 # LLM 提示词模板
+│       └── checklist_prompt.py
 │
-├── archive/                         # 归档文件（非核心）
-│   ├── scripts/                     # 脚本
-│   ├── tests/                       # 测试
-│   ├── examples/                    # 示例
-│   └── ...
+├── domain/                       # 领域层 - 业务逻辑
+│   ├── checkers/                # 检查器实现
+│   │   ├── completeness.py      # 完整性检查器
+│   │   ├── timeliness.py        # 时效性检查器（4步判定规则）
+│   │   └── compliance.py        # 合规性/视觉检查器
+│   └── engine/
+│       └── declarative.py       # 声明式检查引擎
 │
-├── .env.example                     # 环境变量示例
-├── requirements.txt                 # 基础依赖清单
-├── pyproject.toml                   # 项目配置（含可选依赖）
-├── Dockerfile                       # Docker 构建文件
-└── README.md                        # 本文件
+├── core/                         # 核心层 - 数据模型与接口
+│   ├── interfaces.py            # 抽象接口定义（Protocol）
+│   ├── document.py              # Document 数据模型
+│   ├── checklist_model.py       # Checklist 数据模型
+│   ├── result_model.py          # 结果数据模型
+│   ├── checker_base.py          # BaseChecker 抽象基类
+│   ├── checker_registry.py      # 检查器注册表
+│   ├── exceptions.py            # 统一异常定义
+│   └── yaml_compat.py           # YAML 兼容层
+│
+├── infrastructure/               # 基础设施层 - 外部服务实现
+│   ├── parsers/                 # 文档解析器
+│   │   ├── pdf_parser.py        # PDF 解析
+│   │   ├── docx_parser.py       # Word 解析
+│   │   └── image_parser.py      # 图片解析
+│   ├── llm/                     # LLM 客户端
+│   │   ├── client.py            # OpenAI 兼容客户端
+│   │   ├── config.py            # LLM 配置
+│   │   └── semantic_matcher.py  # 语义匹配器
+│   ├── visual/                  # 视觉检测模块
+│   │   ├── qwen_client.py       # Qwen-VL API 封装
+│   │   ├── region_detector.py   # 区域检测器
+│   │   └── screenshot.py        # 截图工具
+│   └── config/                  # 配置管理
+│       └── settings.py
+│
+└── server.py                    # 应用入口
 ```
 
 ## 配置
@@ -368,5 +354,13 @@ asyncio.run(test())
 ---
 
 **项目状态**: MCP Service 版本已稳定 ✅  
-**最后更新**: 2025-03-12  
+**最后更新**: 2026-03-15  
 **维护者**: evob
+
+## 架构特点
+
+- **Clean Architecture 五层架构**: Interface → Application → Domain → Core → Infrastructure
+- **依赖倒置**: 内层定义接口，外层实现接口
+- **依赖注入**: 通过 `bootstrap.py` 完成所有依赖组装
+- **声明式检查引擎**: 根据清单配置自动执行检查
+- **时效性 4 步判定**: 提取有效期 → 提取落款日期 → 确定基准时间 → 核心判定矩阵

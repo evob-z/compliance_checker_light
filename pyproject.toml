@@ -1,6 +1,6 @@
 [project]
 name = "compliance-checker"
-version = "0.1.0"
+version = "1.0.0"
 description = "项目手续合规审查助手 - MCP Server"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,6 +28,7 @@ dependencies = [
     "pillow>=10.0.0",
     "openai>=1.0.0",
     "python-dotenv>=0.21.0",
+    "python-dateutil>=2.8.0",
 ]
 
 [project.optional-dependencies]
@@ -58,7 +59,7 @@ dev = [
 ]
 
 [project.scripts]
-compliance-checker = "compliance_checker.server:main"
+compliance-checker = "compliance_checker.interface.mcp_server:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -67,12 +68,15 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-dir]
+compliance_checker = "src"
+
 [tool.black]
 line-length = 100
 target-version = ['py310']
 
 [tool.coverage.run]
-source = ["src/compliance_checker"]
+source = ["src"]
 omit = [
     # 初始化文件
     "*/__init__.py",

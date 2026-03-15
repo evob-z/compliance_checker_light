@@ -1,1 +1,0 @@
-# Compliance Checker Config
