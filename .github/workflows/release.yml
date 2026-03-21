@@ -83,7 +83,12 @@ jobs:
           fi
           
           mv NEW_CHANGELOG.md CHANGELOG.md
-          rm CHANGELOG.tmp
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.tmp
 
       - name: Commit CHANGELOG
         run: |
@@ -92,12 +97,6 @@ jobs:
           git add CHANGELOG.md
           git commit -m "docs: update changelog for ${{ github.ref_name }}" || echo "No changes to commit"
           git push origin HEAD:${{ github.event.base_ref }} || echo "Push skipped"
-
-      - name: Upload changelog artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: changelog
-          path: CHANGELOG.tmp
 
   # ==========================================================================
   # Job 2: 创建 GitHub Release
