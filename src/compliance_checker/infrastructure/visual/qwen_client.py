@@ -101,6 +101,86 @@ class QwenVLClient(VisualCheckerProtocol):
         """
         return self.api_key is not None and len(self.api_key) > 0
 
+    async def test_connection(self) -> Dict[str, Any]:
+        """
+        测试 Vision API 连通性
+
+        发送一个极简的检测请求，验证 API 配置是否正确。
+
+        Returns:
+            {
+                "success": bool,
+                "message": str,
+                "latency_ms": float  # 响应延迟（毫秒）
+            }
+        """
+        import time
+
+        if not self.api_key:
+            return {
+                "success": False,
+                "message": "Vision API key not configured",
+                "latency_ms": 0.0,
+            }
+
+        # 创建一个 1x1 像素的透明 PNG 图片（最小有效图片）
+        # PNG 格式：89 50 4E 47 0D 0A 1A 0A (文件头) + IHDR + IDAT + IEND
+        minimal_png = bytes([
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  # PNG signature
+            0x00, 0x00, 0x00, 0x0D,  # IHDR chunk length
+            0x49, 0x48, 0x44, 0x52,  # IHDR
+            0x00, 0x00, 0x00, 0x01,  # width: 1
+            0x00, 0x00, 0x00, 0x01,  # height: 1
+            0x08, 0x06, 0x00, 0x00, 0x00,  # 8-bit RGBA
+            0x1F, 0x15, 0xC4, 0x89,  # IHDR CRC
+            0x00, 0x00, 0x00, 0x0A,  # IDAT chunk length
+            0x49, 0x44, 0x41, 0x54,  # IDAT
+            0x78, 0x9C, 0x63, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
+            0x12, 0xCB, 0xF9, 0xC5,  # IDAT data + CRC
+            0x00, 0x00, 0x00, 0x00,  # IEND chunk length
+            0x49, 0x45, 0x4E, 0x44,  # IEND
+            0xAE, 0x42, 0x60, 0x82,  # IEND CRC
+        ])
+
+        start_time = time.time()
+        try:
+            # 发送一个简单的检测请求
+            result = await self._chat_with_bytes(
+                image_bytes=minimal_png,
+                prompt="Is there a seal in this image? Answer yes or no.",
+                temperature=0.0,  # 确定性输出
+            )
+            latency_ms = (time.time() - start_time) * 1000
+
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "message": f"Vision API connected successfully ({self.model})",
+                    "latency_ms": round(latency_ms, 2),
+                }
+            else:
+                error_msg = result.get("error", "Unknown error")
+                # 处理特定错误码
+                if "unavailable" in result:
+                    return {
+                        "success": False,
+                        "message": f"Vision API unavailable: {error_msg}",
+                        "latency_ms": round(latency_ms, 2),
+                    }
+                return {
+                    "success": False,
+                    "message": f"Vision API test failed: {error_msg}",
+                    "latency_ms": round(latency_ms, 2),
+                }
+
+        except Exception as e:
+            latency_ms = (time.time() - start_time) * 1000
+            return {
+                "success": False,
+                "message": f"Vision API connection error: {str(e)}",
+                "latency_ms": round(latency_ms, 2),
+            }
+
     async def detect_seal(self, image_path: str, context: Optional[str] = None) -> Dict[str, Any]:
         """
         检测图片中的公章

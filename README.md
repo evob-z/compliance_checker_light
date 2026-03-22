@@ -155,7 +155,25 @@ mcp_servers:
 
 ### 安装步骤
 
-#### 方式一：使用 pip 安装
+#### 方式一：使用 pip 安装（推荐）
+
+**步骤 1：创建并激活虚拟环境（venv）**
+
+```bash
+# 创建虚拟环境
+python -m venv .venv
+
+# Windows PowerShell 激活
+.venv\Scripts\activate
+
+# 或 Windows CMD 激活
+.venv\Scripts\activate.bat
+
+# 或 Linux/Mac 激活
+source .venv/bin/activate
+```
+
+**步骤 2：安装依赖**
 
 基础安装（最轻量，无 OCR）：
 ```bash
@@ -210,6 +228,51 @@ cp .env.example .env
 ```bash
 python run_check.py
 ```
+
+## 数据隐私与数据流向
+
+使用本工具时，您的文档数据可能会发送到以下外部服务：
+
+### 视觉检测服务（印章/签名识别）
+
+- **服务提供商**：阿里云 DashScope
+- **API 端点**：`https://dashscope.aliyuncs.com/compatible-mode/v1`
+- **使用场景**：当执行视觉检查（印章/签名检测）时，文档图片会被发送到该服务
+- **数据处理方式**：
+  - 图片通过 HTTPS 加密传输
+  - 阿里云 DashScope 服务仅用于推理，不存储用户数据
+  - 详细隐私政策请参考[阿里云 DashScope 服务条款](https://www.aliyun.com/product/dashscope)
+
+### OCR 服务（可选）
+
+根据配置的 `OCR_BACKEND`，文档可能发送到以下服务：
+
+| 后端 | 服务提供商 | 数据流向 | 说明 |
+|------|-----------|---------|------|
+| `none`（默认） | 无 | 本地处理 | 不发送任何数据到外部服务 |
+| `paddle` | 本地 | 本地处理 | 使用本地 PaddleOCR 模型，数据不离开本机 |
+| `aliyun` | 阿里云 | 发送到阿里云 OCR 服务 | 需要配置 `ALIBABA_CLOUD_ACCESS_KEY_ID` 和 `ALIBABA_CLOUD_ACCESS_KEY_SECRET` |
+
+### LLM 服务
+
+- **服务提供商**：阿里云 DashScope（默认）或其他兼容 OpenAI API 的服务
+- **使用场景**：
+  - 生成合规检查清单
+  - 语义匹配文档名称
+  - 提取文档中的日期信息
+- **数据处理方式**：仅发送文本内容，不包含原始文件
+
+### 数据安全建议
+
+1. **敏感文档处理**：建议在上传前对包含敏感信息的文档进行脱敏处理（如遮盖身份证号、银行卡号等）
+2. **本地 OCR**：如需处理高度敏感文档，建议使用 `OCR_BACKEND=paddle` 进行本地 OCR 处理
+3. **网络隔离**：企业用户可通过配置私有 LLM 端点实现完全内网部署
+
+### 数据持久化
+
+- 本工具**不会**将您的文档内容持久化存储到本地磁盘
+- 检查结果仅输出到控制台或返回给调用方
+- 临时文件（如 PDF 转换的中间图片）会在检查完成后自动清理
 
 ## 使用方法
 

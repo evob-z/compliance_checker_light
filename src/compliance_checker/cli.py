@@ -18,7 +18,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-__version__ = "2.0.0"
+__version__ = "1.0.0"
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,8 @@ def _output_error(error_type: str, message: str):
     _output_json({"error": message, "error_type": error_type})
 
 
-def _health_check() -> dict:
-    """执行健康检查，返回 JSON 格式的系统状态"""
+async def _health_check_async() -> dict:
+    """异步健康检查，包含 Vision API 连通性测试"""
     import os
 
     result = {
@@ -91,12 +91,38 @@ def _health_check() -> dict:
         "model": os.getenv("EMBED_MODEL", "text-embedding-v1"),
     }
 
-    # 检查视觉模型
+    # 检查视觉模型配置
     vision_key = os.getenv("VISION_API_KEY", "") or llm_key
+    vision_model = os.getenv("VISION_MODEL", "qwen3-vl-flash")
     result["checks"]["vision_api_key"] = {
         "configured": bool(vision_key),
-        "model": os.getenv("VISION_MODEL", "qwen3-vl-flash"),
+        "model": vision_model,
     }
+
+    # 测试 Vision API 连通性（如果配置了 API Key）
+    if vision_key:
+        try:
+            from .infrastructure.visual.qwen_client import QwenVLClient
+
+            vision_client = QwenVLClient(api_key=vision_key, model=vision_model)
+            vision_test = await vision_client.test_connection()
+            result["checks"]["vision_connection"] = vision_test
+
+            # 如果连通性测试失败，标记为 degraded
+            if not vision_test.get("success", False):
+                result["status"] = "degraded"
+                result["checks"]["vision_api_key"]["error"] = vision_test.get("message", "")
+        except Exception as e:
+            result["checks"]["vision_connection"] = {
+                "success": False,
+                "message": f"Failed to test vision connection: {str(e)}",
+            }
+            result["status"] = "degraded"
+    else:
+        result["checks"]["vision_connection"] = {
+            "success": False,
+            "message": "Vision API key not configured",
+        }
 
     # 检查 PyMuPDF
     try:
@@ -110,6 +136,40 @@ def _health_check() -> dict:
         result["status"] = "degraded"
 
     return result
+
+
+def _health_check() -> dict:
+    """执行健康检查，返回 JSON 格式的系统状态"""
+    # 运行异步健康检查
+    try:
+        return asyncio.run(_health_check_async())
+    except Exception as e:
+        # 如果异步检查失败，回退到同步检查
+        import os
+
+        result = {
+            "status": "degraded",
+            "version": __version__,
+            "python_version": sys.version,
+            "error": f"Health check failed: {str(e)}",
+            "checks": {},
+        }
+
+        # 基础配置检查（同步回退）
+        llm_key = os.getenv("LLM_API_KEY", "")
+        result["checks"]["llm_api_key"] = {
+            "configured": bool(llm_key),
+            "model": os.getenv("LLM_MODEL", "未配置"),
+        }
+
+        vision_key = os.getenv("VISION_API_KEY", "") or llm_key
+        result["checks"]["vision_api_key"] = {
+            "configured": bool(vision_key),
+            "model": os.getenv("VISION_MODEL", "qwen3-vl-flash"),
+            "note": "Vision connection test skipped due to async error",
+        }
+
+        return result
 
 
 def _build_parser() -> argparse.ArgumentParser:

@@ -1,5 +1,7 @@
 ---
 name: compliance-checker
+version: 1.0.0
+license: MIT
 description: >
   AI 驱动的项目手续合规审查 Skill。通过 CLI 子命令检查 PDF/Word/图片文档的
   完整性、时效性和合规性（印章/签名）。当用户需要审查项目文档是否齐全、有效、
@@ -11,8 +13,37 @@ allowed-tools:
 metadata:
   openclaw:
     requires:
-      bins: [python, compliance-checker]
-      env: [LLM_API_KEY]
+      bins: [python, pip]
+      install: pip install compliance-checker
+      env:
+        # LLM 核心配置
+        - LLM_API_KEY
+        - LLM_BASE_URL
+        - LLM_MODEL
+        # LLM 可选配置
+        - LLM_TIMEOUT
+        - LLM_MAX_RETRIES
+        # 嵌入模型配置（可选，用于语义匹配）
+        - EMBED_API_KEY
+        - EMBED_BASE_URL
+        - EMBED_MODEL
+        # 视觉模型配置（可选，用于印章/签名检测）
+        - VISION_API_KEY
+        - VISION_MODEL
+        # OCR 配置（可选）
+        - OCR_BACKEND
+        - ALIBABA_CLOUD_ACCESS_KEY_ID
+        - ALIBABA_CLOUD_ACCESS_KEY_SECRET
+        - ALIBABA_CLOUD_OCR_ENDPOINT
+        # 功能开关配置（可选）
+        - CC_SIMILARITY_THRESHOLD
+        - CC_USE_SEMANTIC
+        - CC_VISUAL_ENABLED
+        - CC_VISUAL_CONFIDENCE_THRESHOLD
+        - CC_VISUAL_CHECK_TYPE
+        - CC_PDF_ZOOM_FACTOR
+        - CC_OUTPUT_DIR
+        - CC_DOCUMENT_PATH
 ---
 
 # Compliance Checker - 项目手续合规审查 CLI
@@ -152,13 +183,34 @@ compliance-checker --health-check   # 输出 JSON 格式的健康状态
 当用户要求审查文档时，按以下步骤执行：
 
 1. **验证安装**：首次使用前运行 `compliance-checker --version` 确认可用
-2. **确认文件位置**：如用户没有明确路径，使用 Glob 或 Bash 帮助定位
+2. **确认文件位置**：**优先使用用户明确提供的具体路径**
+   - 如用户已提供路径，直接使用，不进行扫描
+   - 如用户未提供路径，可询问或进行**有限范围**的路径探测
 3. **分析用户意图**：从用户描述中提取检查维度：
    - 需要检查哪些文件 -> 使用 `completeness`
    - 需要检查有效期 -> 使用 `timeliness`
    - 需要检查印章/签名 -> 使用 `visual`
 4. **执行子命令**：根据需要调用一个或多个子命令
 5. **汇总结果**：解析 JSON 输出，向用户汇报
+
+### 路径探测约束（安全规范）
+
+仅在用户未提供路径时，允许使用 Glob/Bash 进行**有限范围**的路径探测：
+
+- **范围限制**：仅扫描当前工作目录及其**一级子目录**（`./` 和 `./*/`)）
+- **禁止递归**：不允许使用 `**/` 等递归模式进行无限制扫描
+- **文件类型限制**：仅扫描支持的文档格式（.pdf, .docx, .doc, .png, .jpg, .jpeg）
+- **用户确认**：扫描结果应展示给用户，由用户确认后再执行检查
+
+**推荐做法**：
+```bash
+# 优先询问用户
+"请提供文档所在路径，或确认是否扫描当前目录？"
+
+# 有限范围扫描示例（仅一级子目录）
+glob "*.pdf" "*.docx"          # 当前目录
+glob "*/*.pdf" "*/*.docx"      # 一级子目录（不推荐）
+```
 
 ### 示例：发票审查
 
@@ -222,6 +274,24 @@ compliance-checker visual --file "D:/projects/building/立项批复.pdf" --targe
 # 安装与配置（给用户）
 
 ## 安装
+
+**步骤 1：创建并激活虚拟环境（venv）**
+
+```bash
+# 创建虚拟环境
+python -m venv .venv
+
+# Windows PowerShell 激活
+.venv\Scripts\activate
+
+# 或 Windows CMD 激活
+.venv\Scripts\activate.bat
+
+# 或 Linux/Mac 激活
+source .venv/bin/activate
+```
+
+**步骤 2：安装 compliance-checker**
 
 ```bash
 pip install compliance-checker
