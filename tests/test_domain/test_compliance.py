@@ -15,10 +15,10 @@ VisualChecker（合规性/视觉检查器）单元测试
 import pytest
 from typing import Dict, Any, Optional, List
 
-from src.core.checker_base import CheckStatus, CheckResult
-from src.core.document import Document
-from src.core.checklist_model import Checklist
-from src.domain.checkers.compliance import VisualChecker, VisualCheckType
+from src.compliance_checker.core.checker_base import CheckStatus, CheckResult
+from src.compliance_checker.core.document import Document
+from src.compliance_checker.core.checklist_model import Checklist
+from src.compliance_checker.domain.checkers.compliance import VisualChecker, VisualCheckType
 
 
 class MockVisualClient:

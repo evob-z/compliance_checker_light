@@ -333,8 +333,9 @@ async def process_documents(
 | `aliyun` | 阿里云 OCR | `pip install -e ".[cloud-ocr]"` | 轻量部署、低频使用 |
 
 **开发时注意事项：**
-- OCR 后端在 `parsers/ocr_engine.py` 中实现
-- 新增 OCR 后端需继承 `BaseOCREngine` 类
+- OCR 后端在 [`src/compliance_checker/infrastructure/llm/ocr_engine.py`](src/compliance_checker/infrastructure/llm/ocr_engine.py) 中实现，需实现 Core 层的 `OCREngineProtocol`。
+- 阿里云分支使用官方 SDK 的 **RecognizeGeneral** 接口；返回体中 `Data` 为 JSON 字符串，解析逻辑见 `_parse_recognize_general_data`（优先 `content`，否则拼接 `prism_wordsInfo` 中的 `word`）。
+- 可选环境变量 **`ALIBABA_CLOUD_OCR_ENDPOINT`**：未设置时默认 `ocr-api.cn-hangzhou.aliyuncs.com`。
 - 使用延迟导入避免未安装依赖时报错
 
 ### Docker 构建参数

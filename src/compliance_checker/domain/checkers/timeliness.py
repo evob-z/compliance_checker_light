@@ -10,7 +10,7 @@
 - 不导入任何 infrastructure 或旧的 tools 模块
 
 全新业务规则（4步判定）：
-1. 提取有效期（Validity Period）
+1. 提取有效期（Validity Period）- 支持关键词定位+LLM提取
 2. 提取落款日期（Sign Date）
 3. 确定比对基准时间（Reference Time）
 4. 核心判定矩阵
@@ -19,12 +19,15 @@
 import re
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, NamedTuple
+from typing import Any, Dict, List, Optional, Tuple, NamedTuple, TYPE_CHECKING
 from dateutil.relativedelta import relativedelta
 
 from ...core.checker_base import BaseChecker, CheckResult, CheckStatus
 from ...core.checklist_model import Checklist
 from ...core.document import Document
+
+if TYPE_CHECKING:
+    from ...core.interfaces import LLMClientProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,7 @@ class ValidityPeriod(NamedTuple):
     """有效期数据结构"""
 
     value: int  # 数值
-    unit: str  # 单位: years, months, days
+    unit: str  # 单位: years, months, days, permanent, unknown
     is_permanent: bool = False  # 是否长期有效
 
 
@@ -45,6 +48,13 @@ class DateMatch(NamedTuple):
     distance_to_keyword: int  # 距离最近关键词的字符数
 
 
+class ValidityExtractionResult(NamedTuple):
+    """有效期提取结果"""
+
+    period: Optional[ValidityPeriod]
+    source: str  # 提取来源: "regex", "llm", "none"
+
+
 class TimelinessChecker(BaseChecker):
     """
     时效性检查器 - 全新业务规则实现
@@ -53,24 +63,27 @@ class TimelinessChecker(BaseChecker):
     - 分支 A：有有效期但无落款日期 → 不通过
     - 分支 B：有落款日期但无有效期（长期有效）→ 落款日期 ≤ 基准时间则通过
     - 分支 C：两者都有 → 落款日期 ≤ 基准时间 ≤ 截止日期则通过
+    
+    有效期提取策略：
+    1. 关键词定位：寻找"有效期"关键词
+    2. 动态切片：截取关键词后50字符内的内容
+    3. 快速探测：使用正则检测是否有数字/时间词
+    4. LLM提取：如果检测到数字，使用LLM提取结构化有效期
+    5. 未知处理：如果匹配到"有效期"但无法提取具体时间，标记为UNKNOWN
     """
 
-    # 有效期提取正则模式
-    VALIDITY_PATTERNS = [
-        # 数字 + 单位格式
-        (r"有效期[限\s]*[:：]?\s*(\d+)\s*年", "years"),
-        (r"有效期[限\s]*[:：]?\s*(\d+)\s*个月", "months"),
-        (r"有效期[限\s]*[:：]?\s*(\d+)\s*月", "months"),
-        (r"有效期[限\s]*[:：]?\s*(\d+)\s*天", "days"),
-        (r"有效期[限\s]*[:：]?\s*(\d+)\s*日", "days"),
-        # 中文数字格式
-        (r"有效期[限\s]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*年", "years_chinese"),
-        (r"有效期[限\s]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*个月", "months_chinese"),
-        (r"有效期[限\s]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*月", "months_chinese"),
-        (r"有效期[限\s]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*天", "days_chinese"),
-        (r"有效期[限\s]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*日", "days_chinese"),
-        # 长期/永久有效
-        (r"(长期有效|永久有效|长期|永久)", "permanent"),
+    # 有效期关键词
+    VALIDITY_KEYWORD = "有效期"
+    
+    # 长期/永久有效正则
+    PERMANENT_PATTERN = re.compile(r"(长期有效|永久有效|长期|永久)", re.IGNORECASE)
+    
+    # 日期提取正则模式
+    DATE_PATTERNS = [
+        (r"(\d{4})年(\d{1,2})月(\d{1,2})日", "ymd"),  # 2024年3月15日
+        (r"(\d{4})-(\d{2})-(\d{2})", "ymd"),  # 2024-03-15
+        (r"(\d{4})/(\d{2})/(\d{2})", "ymd"),  # 2024/03/15
+        (r"(\d{4})\.(\d{2})\.(\d{2})", "ymd"),  # 2024.03.15
     ]
 
     # 日期提取正则模式
@@ -121,14 +134,20 @@ class TimelinessChecker(BaseChecker):
         "万": 10000,
     }
 
-    def __init__(self, project_period: Optional[Dict[str, str]] = None):
+    def __init__(
+        self,
+        project_period: Optional[Dict[str, str]] = None,
+        llm_client: Optional["LLMClientProtocol"] = None,
+    ):
         """
         初始化检查器
 
         Args:
             project_period: 可选的项目周期 {"start": "YYYY-MM", "end": "YYYY-MM"}
+            llm_client: LLM 客户端，用于提取有效期（可选，未提供则使用正则提取）
         """
         self.project_period = project_period
+        self.llm_client = llm_client
 
     @property
     def name(self) -> str:
@@ -163,27 +182,216 @@ class TimelinessChecker(BaseChecker):
         result += temp
         return result if result > 0 else 1
 
-    def _extract_validity_period(self, text: str) -> Optional[ValidityPeriod]:
+    def _locate_validity_keyword(self, text: str) -> List[int]:
         """
-        步骤 1: 提取有效期（Validity Period）
-
-        从文档内容中提取有效期，支持多种格式：
-        - "有效期一年"、"有效期限: 6个月"、"有效期三十天"
-        - 未提取到则默认返回长期有效（is_permanent=True）
-
+        定位所有"有效期"关键词的位置
+        
+        策略：只匹配作为有效期声明的"有效期"，即后面跟着动词或标点的
+        如"有效期为"、"有效期："、"有效期至"、"有效期1年"等
+        排除作为普通词汇的"有效期"，如"有效期声明"中的"有效期"
+        
         Args:
-            text: 文档文本内容
-
+            text: 文档文本
+            
         Returns:
-            ValidityPeriod 对象，未找到则返回 None（调用方应视为长期有效）
+            关键词起始位置列表
         """
-        for pattern, unit in self.VALIDITY_PATTERNS:
+        positions = []
+        keyword = self.VALIDITY_KEYWORD
+        start = 0
+        
+        # 有效期声明后面通常跟着的内容
+        valid_follow_patterns = [
+            r'[限\s为是至：:\d一二三四五六七八九十百千万]',  # 有效期为、有效期至、有效期：、有效期3年
+            r'[\d]',  # 有效期3年
+        ]
+        
+        while True:
+            pos = text.find(keyword, start)
+            if pos == -1:
+                break
+            
+            # 检查"有效期"后面是否跟着声明相关的字符
+            after_pos = pos + len(keyword)
+            if after_pos < len(text):
+                next_char = text[after_pos]
+                # 如果后面跟着限、为、是、至、：、空格或数字/中文数字，认为是有效期声明
+                valid_chars = '限为是至：: \t一二三四五六七八九十百千万1234567890'
+                if next_char in valid_chars:
+                    positions.append(pos)
+            else:
+                # "有效期"在文本末尾，也认为是声明
+                positions.append(pos)
+            
+            start = pos + len(keyword)
+        
+        return positions
+    
+    def _extract_context_slice(self, text: str, keyword_pos: int, max_chars: int = 50) -> str:
+        """
+        动态切片：截取关键词后指定字符数内的内容
+        
+        Args:
+            text: 文档文本
+            keyword_pos: 关键词位置
+            max_chars: 最大截取字符数
+            
+        Returns:
+            切片内容
+        """
+        start = keyword_pos
+        end = min(keyword_pos + len(self.VALIDITY_KEYWORD) + max_chars, len(text))
+        return text[start:end]
+    
+    def _has_number_or_time(self, text: str) -> bool:
+        """
+        快速探测：检测文本中是否有有效期相关的数字或时间词
+        
+        策略：提取"有效期"到第一个标点/分隔符之间的内容，检查是否包含
+        有效期相关的数字（如"3年"、"六个月"）或长期有效标记
+        
+        Args:
+            text: 文本内容（已切片的关键词上下文）
+            
+        Returns:
+            True 如果检测到有效期相关的数字或时间词
+        """
+        # 移除"有效期"关键词本身
+        keyword_len = len(self.VALIDITY_KEYWORD)
+        if text.startswith(self.VALIDITY_KEYWORD):
+            content = text[keyword_len:]
+        else:
+            content = text
+        
+        # 提取到第一个标点符号或特定分隔符之前的内容
+        # 分隔符包括：逗号、句号、分号、冒号、换行、"签发"、"日期"等
+        delimiters = ['，', '。', '；', '：', '\n', '签发', '日期', '盖章', '签字']
+        end_pos = len(content)
+        for delimiter in delimiters:
+            pos = content.find(delimiter)
+            if pos > 0 and pos < end_pos:
+                end_pos = pos
+        
+        core_content = content[:end_pos].strip()
+        
+        # 在核心内容中检测长期/永久有效
+        if self.PERMANENT_PATTERN.search(core_content):
+            return True
+        
+        # 在核心内容中检测数字+时间单位
+        # 匹配：X年、X个月、X月、X天、X日、至XXXX年
+        validity_number_pattern = re.compile(
+            r'([\d一二三四五六七八九十百千万]+)\s*[年]|'
+            r'([\d一二三四五六七八九十百千万]+)\s*个月|'
+            r'([\d一二三四五六七八九十百千万]+)\s*[月天日]|'
+            r'至\s*(\d{4})\s*年',
+            re.IGNORECASE
+        )
+        
+        matches = validity_number_pattern.findall(core_content)
+        for match in matches:
+            # match 是 tuple，取第一个非空组
+            num_str = next((m for m in match if m), '')
+            if num_str:
+                # 匹配到任何数字+时间单位组合即认为有有效期信息
+                return True
+        
+        return False
+    
+    async def _extract_validity_with_llm(self, context: str) -> Optional[ValidityPeriod]:
+        """
+        使用 LLM 从上下文中提取有效期
+        
+        Args:
+            context: 包含有效期的文本片段
+            
+        Returns:
+            ValidityPeriod 对象，提取失败返回 None
+        """
+        if not self.llm_client:
+            return None
+            
+        prompt = f"""从以下文本中提取有效期信息，以JSON格式返回：
+
+文本："{context}"
+
+请分析文本中的有效期信息，返回以下JSON格式：
+{{
+    "has_validity": true/false,  // 是否包含有效期信息
+    "value": 数字或null,  // 有效期数值，如 3
+    "unit": "years/months/days/permanent/unknown",  // 单位：年/月/日/长期有效/未知
+    "reason": "提取理由或失败原因"
+}}
+
+注意：
+- 如果文本包含"长期有效"、"永久有效"等，unit 设为 "permanent"
+- 如果提到有效期但无法确定具体时间，unit 设为 "unknown"
+- 如果没有提到有效期，has_validity 设为 false
+
+只返回JSON，不要其他内容。"""
+
+        try:
+            response = await self.llm_client.complete(prompt, temperature=0.1, max_tokens=500)
+            import json
+            
+            # 尝试解析 JSON
+            result = json.loads(response.strip())
+            
+            if not result.get("has_validity", False):
+                return None
+                
+            unit = result.get("unit", "unknown")
+            
+            if unit == "permanent":
+                return ValidityPeriod(value=0, unit="permanent", is_permanent=True)
+            elif unit == "unknown":
+                # 标记为未知有效期
+                return ValidityPeriod(value=0, unit="unknown", is_permanent=False)
+            else:
+                value = result.get("value", 0)
+                if value and value > 0:
+                    return ValidityPeriod(value=value, unit=unit, is_permanent=False)
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"LLM 提取有效期失败: {e}")
+            return None
+    
+    def _extract_validity_regex(self, text: str) -> Optional[ValidityPeriod]:
+        """
+        使用正则表达式提取有效期（备用方案）
+        
+        Args:
+            text: 文本内容
+            
+        Returns:
+            ValidityPeriod 对象，未找到返回 None
+        """
+        # 先检测长期有效
+        if self.PERMANENT_PATTERN.search(text):
+            return ValidityPeriod(value=0, unit="permanent", is_permanent=True)
+        
+        # 正则模式列表
+        patterns = [
+            # 数字 + 单位格式
+            (r"有效期[限\s为]*[:：]?\s*(\d+)\s*年", "years"),
+            (r"有效期[限\s为]*[:：]?\s*(\d+)\s*个月", "months"),
+            (r"有效期[限\s为]*[:：]?\s*(\d+)\s*月", "months"),
+            (r"有效期[限\s为]*[:：]?\s*(\d+)\s*天", "days"),
+            (r"有效期[限\s为]*[:：]?\s*(\d+)\s*日", "days"),
+            # 中文数字格式
+            (r"有效期[限\s为]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*年", "years_chinese"),
+            (r"有效期[限\s为]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*个月", "months_chinese"),
+            (r"有效期[限\s为]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*月", "months_chinese"),
+            (r"有效期[限\s为]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*天", "days_chinese"),
+            (r"有效期[限\s为]*[:：]?\s*([一二三四五六七八九十百千万]+)\s*日", "days_chinese"),
+        ]
+        
+        for pattern, unit in patterns:
             matches = list(re.finditer(pattern, text, re.IGNORECASE))
             if matches:
-                match = matches[0]  # 取第一个匹配
-                if unit == "permanent":
-                    return ValidityPeriod(value=0, unit="permanent", is_permanent=True)
-
+                match = matches[0]
                 try:
                     value_str = match.group(1)
                     if "chinese" in unit:
@@ -191,12 +399,121 @@ class TimelinessChecker(BaseChecker):
                         unit = unit.replace("_chinese", "")
                     else:
                         value = int(value_str)
-
                     return ValidityPeriod(value=value, unit=unit, is_permanent=False)
                 except (ValueError, IndexError):
                     continue
-
-        # 未提取到有效期声明，返回 None（调用方应视为长期有效）
+        
+        return None
+    
+    async def _extract_validity_period_async(self, text: str) -> ValidityExtractionResult:
+        """
+        步骤 1: 提取有效期（Validity Period）- 关键词定位+LLM提取
+        
+        提取策略：
+        1. 先检测长期有效（不需要"有效期"关键词）
+        2. 关键词定位：寻找"有效期"关键词
+        3. 动态切片：截取关键词后50字符内的内容
+        4. 快速探测：使用正则检测是否有数字/时间词
+        5. LLM提取：如果检测到数字，使用LLM提取结构化有效期
+        6. 正则备用：LLM失败时使用正则提取
+        7. 未知处理：如果匹配到"有效期"但无法提取具体时间，标记为UNKNOWN
+        
+        Args:
+            text: 文档文本内容
+            
+        Returns:
+            ValidityExtractionResult 对象
+        """
+        # 1. 先检测长期有效（不需要"有效期"关键词）
+        if self.PERMANENT_PATTERN.search(text):
+            return ValidityExtractionResult(
+                period=ValidityPeriod(value=0, unit="permanent", is_permanent=True),
+                source="regex"
+            )
+        
+        # 2. 关键词定位
+        keyword_positions = self._locate_validity_keyword(text)
+        
+        if not keyword_positions:
+            # 没有找到"有效期"关键词
+            return ValidityExtractionResult(period=None, source="none")
+        
+        found_keyword_without_time = False
+        
+        # 对每个关键词位置尝试提取
+        for pos in keyword_positions:
+            # 3. 动态切片
+            context = self._extract_context_slice(text, pos, max_chars=50)
+            
+            # 4. 快速探测
+            if not self._has_number_or_time(context):
+                # 匹配到"有效期"但没有数字/时间词
+                logger.debug(f"匹配到'有效期'但无具体时间: {context}")
+                found_keyword_without_time = True
+                continue
+            
+            # 5. 尝试使用 LLM 提取
+            if self.llm_client:
+                period = await self._extract_validity_with_llm(context)
+                if period:
+                    return ValidityExtractionResult(period=period, source="llm")
+            
+            # 6. LLM 失败或未配置，使用正则备用
+            period = self._extract_validity_regex(context)
+            if period:
+                return ValidityExtractionResult(period=period, source="regex")
+        
+        # 7. 所有位置都尝试过
+        if found_keyword_without_time:
+            # 匹配到"有效期"但无法提取具体时间，标记为UNKNOWN
+            return ValidityExtractionResult(
+                period=ValidityPeriod(value=0, unit="unknown", is_permanent=False),
+                source="unknown"
+            )
+        
+        return ValidityExtractionResult(period=None, source="none")
+    
+    def _extract_validity_period(self, text: str) -> Optional[ValidityPeriod]:
+        """
+        同步版本：提取有效期（供非异步上下文使用）
+        
+        注意：此方法只使用正则提取，不使用LLM
+        
+        Args:
+            text: 文档文本内容
+            
+        Returns:
+            ValidityPeriod 对象，未找到返回 None，匹配到但无法提取返回 UNKNOWN
+        """
+        # 先检测长期有效（不需要"有效期"关键词）
+        if self.PERMANENT_PATTERN.search(text):
+            return ValidityPeriod(value=0, unit="permanent", is_permanent=True)
+        
+        # 关键词定位
+        keyword_positions = self._locate_validity_keyword(text)
+        
+        if not keyword_positions:
+            return None
+        
+        found_keyword_without_time = False
+        
+        for pos in keyword_positions:
+            context = self._extract_context_slice(text, pos, max_chars=50)
+            
+            if not self._has_number_or_time(context):
+                # 匹配到"有效期"但无具体时间
+                found_keyword_without_time = True
+                continue
+            
+            period = self._extract_validity_regex(context)
+            if period:
+                return period
+        
+        # 所有位置都尝试过
+        if found_keyword_without_time:
+            # 匹配到"有效期"但无法提取具体时间，标记为UNKNOWN
+            return ValidityPeriod(value=0, unit="unknown", is_permanent=False)
+        
         return None
 
     def _extract_all_dates(self, text: str) -> List[DateMatch]:
@@ -359,70 +676,73 @@ class TimelinessChecker(BaseChecker):
         else:
             return sign_date + relativedelta(years=1)  # 默认一年
 
-    def evaluate_document(self, document: Document, reference_time: datetime) -> Dict[str, Any]:
+    def _build_validity_description(self, validity: Optional[ValidityPeriod]) -> str:
         """
-        步骤 4: 核心判定矩阵
-
-        判定分支：
-        - 分支 A：有有效期但无落款日期 → 不通过
-        - 分支 B：有落款日期但无有效期（长期有效）→ 落款日期 ≤ 基准时间则通过
-        - 分支 C：两者都有 → 落款日期 ≤ 基准时间 ≤ 截止日期则通过
-
+        构建有效期说明文本
+        
         Args:
-            document: 文档对象
-            reference_time: 基准时间
-
+            validity: 有效期对象
+            
         Returns:
-            判定结果字典
+            有效期描述文本
         """
-        text = document.content or ""
-
-        # 提取有效期和落款日期
-        validity = self._extract_validity_period(text)
-        sign_date = self._extract_sign_date(text)
-
-        has_validity = validity is not None
+        if not validity:
+            return "长期有效（未声明有效期）"
+        
+        if validity.is_permanent:
+            return "长期有效"
+        elif validity.unit == "years":
+            return f"有效期{validity.value}年"
+        elif validity.unit == "months":
+            return f"有效期{validity.value}个月"
+        elif validity.unit == "days":
+            return f"有效期{validity.value}天"
+        elif validity.unit == "unknown":
+            return "有效期未知（文档中提到有效期但无法确定具体时间）"
+        else:
+            return f"有效期{validity.value}{validity.unit}"
+    
+    def _evaluate_with_validity(
+        self,
+        result: Dict[str, Any],
+        validity: Optional[ValidityPeriod],
+        sign_date: Optional[datetime],
+        reference_time: datetime,
+    ) -> Dict[str, Any]:
+        """
+        根据有效期和落款日期进行判定
+        
+        Args:
+            result: 结果字典
+            validity: 有效期对象
+            sign_date: 落款日期
+            reference_time: 基准时间
+            
+        Returns:
+            更新后的结果字典
+        """
+        has_validity = validity is not None and validity.unit != "unknown"
+        has_unknown_validity = validity is not None and validity.unit == "unknown"
         has_sign_date = sign_date is not None
-
-        result = {
-            "document_name": document.name,
-            "has_validity": has_validity,
-            "has_sign_date": has_sign_date,
-            "validity": None,
-            "sign_date": sign_date.strftime("%Y-%m-%d") if sign_date else None,
-            "expiry_date": None,
-            "reference_time": reference_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "passed": False,
-            "reason": "",
-            "branch": None,
-        }
-
-        if validity:
-            result["validity"] = {
-                "value": validity.value,
-                "unit": validity.unit,
-                "is_permanent": validity.is_permanent,
-            }
-
-        # 格式化日期显示
+        
         sign_date_str = result["sign_date"] if result["sign_date"] else "未提取到"
         ref_time_str = reference_time.strftime("%Y-%m-%d")
-
-        # 构建有效期说明
-        if validity:
-            if validity.is_permanent:
-                validity_desc = "长期有效"
-            elif validity.unit == "years":
-                validity_desc = f"有效期{validity.value}年"
-            elif validity.unit == "months":
-                validity_desc = f"有效期{validity.value}个月"
-            elif validity.unit == "days":
-                validity_desc = f"有效期{validity.value}天"
+        validity_desc = self._build_validity_description(validity)
+        
+        # 处理有效期未知的情况
+        if has_unknown_validity:
+            result["branch"] = "UNKNOWN"
+            result["passed"] = False
+            if has_sign_date:
+                result["reason"] = (
+                    f"印章时间{sign_date_str}，{validity_desc}，无法完成时效性审查。"
+                )
             else:
-                validity_desc = f"有效期{validity.value}{validity.unit}"
-        else:
-            validity_desc = "长期有效（未声明有效期）"
-
+                result["reason"] = (
+                    f"印章时间未提取到，{validity_desc}，无法完成时效性审查。"
+                )
+            return result
+        
         # 分支 A：有有效期但无落款日期
         if has_validity and not has_sign_date:
             result["branch"] = "A"
@@ -435,7 +755,6 @@ class TimelinessChecker(BaseChecker):
         # 分支 B：有落款日期但无有效期（视为长期有效）
         if has_sign_date and not has_validity:
             result["branch"] = "B"
-            # 长期有效
             result["validity"] = {"is_permanent": True}
 
             if sign_date <= reference_time:
@@ -451,7 +770,7 @@ class TimelinessChecker(BaseChecker):
             return result
 
         # 分支 C：两者都有
-        if has_sign_date and has_validity:
+        if has_sign_date and has_validity and validity:
             result["branch"] = "C"
             expiry_date = self._calculate_expiry_date(sign_date, validity)
             result["expiry_date"] = expiry_date.strftime("%Y-%m-%d")
@@ -486,6 +805,98 @@ class TimelinessChecker(BaseChecker):
         result["reason"] = f"印章时间未提取到，有效期信息缺失，无法完成时效性审查。"
         return result
 
+    def evaluate_document(self, document: Document, reference_time: datetime) -> Dict[str, Any]:
+        """
+        步骤 4: 核心判定矩阵（同步版本）
+
+        判定分支：
+        - 分支 A：有有效期但无落款日期 → 不通过
+        - 分支 B：有落款日期但无有效期（长期有效）→ 落款日期 ≤ 基准时间则通过
+        - 分支 C：两者都有 → 落款日期 ≤ 基准时间 ≤ 截止日期则通过
+        - 分支 UNKNOWN：有有效期声明但无法提取具体时间 → 不通过
+
+        Args:
+            document: 文档对象
+            reference_time: 基准时间
+
+        Returns:
+            判定结果字典
+        """
+        text = document.content or ""
+
+        # 提取有效期和落款日期
+        validity = self._extract_validity_period(text)
+        sign_date = self._extract_sign_date(text)
+
+        result = {
+            "document_name": document.name,
+            "has_validity": validity is not None and validity.unit != "unknown",
+            "has_sign_date": sign_date is not None,
+            "validity": None,
+            "sign_date": sign_date.strftime("%Y-%m-%d") if sign_date else None,
+            "expiry_date": None,
+            "reference_time": reference_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "passed": False,
+            "reason": "",
+            "branch": None,
+        }
+
+        if validity:
+            result["validity"] = {
+                "value": validity.value,
+                "unit": validity.unit,
+                "is_permanent": validity.is_permanent,
+            }
+
+        return self._evaluate_with_validity(result, validity, sign_date, reference_time)
+    
+    async def evaluate_document_async(self, document: Document, reference_time: datetime) -> Dict[str, Any]:
+        """
+        步骤 4: 核心判定矩阵（异步版本，支持LLM提取）
+
+        判定分支：
+        - 分支 A：有有效期但无落款日期 → 不通过
+        - 分支 B：有落款日期但无有效期（长期有效）→ 落款日期 ≤ 基准时间则通过
+        - 分支 C：两者都有 → 落款日期 ≤ 基准时间 ≤ 截止日期则通过
+        - 分支 UNKNOWN：有有效期声明但无法提取具体时间 → 不通过
+
+        Args:
+            document: 文档对象
+            reference_time: 基准时间
+
+        Returns:
+            判定结果字典
+        """
+        text = document.content or ""
+
+        # 使用异步版本提取有效期（支持LLM）
+        extraction_result = await self._extract_validity_period_async(text)
+        validity = extraction_result.period
+        sign_date = self._extract_sign_date(text)
+
+        result = {
+            "document_name": document.name,
+            "has_validity": validity is not None and validity.unit != "unknown",
+            "has_sign_date": sign_date is not None,
+            "validity": None,
+            "sign_date": sign_date.strftime("%Y-%m-%d") if sign_date else None,
+            "expiry_date": None,
+            "reference_time": reference_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "passed": False,
+            "reason": "",
+            "branch": None,
+            "validity_source": extraction_result.source,  # 记录提取来源
+        }
+
+        if validity:
+            result["validity"] = {
+                "value": validity.value,
+                "unit": validity.unit,
+                "is_permanent": validity.is_permanent,
+            }
+
+        return self._evaluate_with_validity(result, validity, sign_date, reference_time)
+
     async def check(
         self, documents: List[Document], checklist: Optional[Checklist], config: Dict[str, Any]
     ) -> CheckResult:
@@ -497,6 +908,7 @@ class TimelinessChecker(BaseChecker):
             checklist: 审核清单（可选）
             config: 检查配置
                 - reference_time: 自定义校验时间（可选）
+                - use_llm: 是否使用LLM提取有效期（可选，默认True如果llm_client已配置）
 
         Returns:
             CheckResult: 检查结果
@@ -511,23 +923,43 @@ class TimelinessChecker(BaseChecker):
 
         # 步骤 3: 确定基准时间
         reference_time = self._get_reference_time(config)
+        
+        # 检查是否使用LLM
+        use_llm = config.get("use_llm", self.llm_client is not None)
 
         try:
             document_results = []
             passed_count = 0
             failed_count = 0
             unclear_count = 0
+            unknown_count = 0
             issues = []
 
             for doc in documents:
                 # 步骤 4: 对每个文档执行核心判定
-                eval_result = self.evaluate_document(doc, reference_time)
+                if use_llm and self.llm_client:
+                    eval_result = await self.evaluate_document_async(doc, reference_time)
+                else:
+                    eval_result = self.evaluate_document(doc, reference_time)
                 document_results.append(eval_result)
 
                 if eval_result["passed"]:
                     passed_count += 1
                 elif eval_result["branch"] == "NONE":
                     unclear_count += 1
+                elif eval_result["branch"] == "UNKNOWN":
+                    unknown_count += 1
+                    failed_count += 1
+                    issues.append(
+                        {
+                            "type": "timeliness_unknown",
+                            "document": doc.name,
+                            "branch": eval_result["branch"],
+                            "reason": eval_result["reason"],
+                            "sign_date": eval_result["sign_date"],
+                            "expiry_date": eval_result["expiry_date"],
+                        }
+                    )
                 else:
                     failed_count += 1
                     issues.append(
@@ -555,6 +987,7 @@ class TimelinessChecker(BaseChecker):
                 "passed": passed_count,
                 "failed": failed_count,
                 "unclear": unclear_count,
+                "unknown": unknown_count,
                 "reference_time": reference_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "documents": document_results,
             }
@@ -565,6 +998,8 @@ class TimelinessChecker(BaseChecker):
                 message += f", {failed_count} 个文档未通过"
             if unclear_count > 0:
                 message += f", {unclear_count} 个文档信息不明确"
+            if unknown_count > 0:
+                message += f", {unknown_count} 个文档有效期未知"
 
             return CheckResult(
                 check_type=self.name, status=status, message=message, details=details, issues=issues

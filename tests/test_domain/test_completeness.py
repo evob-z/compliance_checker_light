@@ -15,11 +15,11 @@ CompletenessChecker 单元测试
 import pytest
 from typing import List, Tuple
 
-from src.core.checker_base import CheckStatus, CheckResult
-from src.core.document import Document
-from src.core.checklist_model import Checklist, RequiredDocument, SupportedFileType
-from src.core.result_model import MatchType
-from src.domain.checkers.completeness import CompletenessChecker
+from src.compliance_checker.core.checker_base import CheckStatus, CheckResult
+from src.compliance_checker.core.document import Document
+from src.compliance_checker.core.checklist_model import Checklist, RequiredDocument, SupportedFileType
+from src.compliance_checker.core.result_model import MatchType
+from src.compliance_checker.domain.checkers.completeness import CompletenessChecker
 
 
 class MockSemanticMatcher:

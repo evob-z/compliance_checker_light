@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "compliance-checker": {
-      "command": "compliance-checker"
-    }
-  }
-}

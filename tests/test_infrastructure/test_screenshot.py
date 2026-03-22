@@ -407,7 +407,7 @@ class TestWithoutPyMuPDF:
         - 所有函数都抛出 DocumentParseError
         """
         # 临时禁用 HAS_FITZ
-        import src.infrastructure.visual.screenshot as screenshot_module
+        import src.compliance_checker.infrastructure.visual.screenshot as screenshot_module
 
         original_has_fitz = screenshot_module.HAS_FITZ
 

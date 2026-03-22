@@ -1,0 +1,8 @@
+{
+  "name": "compliance-checker",
+  "version": "1.0.0",
+  "description": "项目手续合规审查 CLI Skill",
+  "author": "evob",
+  "tags": ["compliance", "document-check", "cli", "ocr", "pdf"],
+  "license": "MIT"
+}

@@ -310,6 +310,83 @@ mcp_servers:
 检查 /path/to/documents 文件夹中的发票，验证日期是否有效，是否有印章
 ```
 
+### 示例文件与命令
+
+`Examples/` 目录包含 4 个测试文档，演示不同检查场景：
+
+#### 1. 完整合规检查（立项批复）
+
+**文件**：`01_立项批复_示范智慧城市项目.pdf`
+
+**场景**：检查公章、签字、文件编号、日期等要素是否齐全
+
+**命令**：
+```bash
+# 检查文档完整性
+compliance-checker completeness --path ./Examples --documents "立项批复"
+
+# 检查时效性
+compliance-checker timeliness --file "./Examples/01_立项批复_示范智慧城市项目.pdf"
+
+# 视觉检查：公章和签字
+compliance-checker visual --file "./Examples/01_立项批复_示范智慧城市项目.pdf" --targets "公章,法人签字"
+```
+
+#### 2. 有效期检查（施工许可证）
+
+**文件**：`03_施工许可证_示范项目.pdf`
+
+**场景**：验证文件有效期是否覆盖项目周期（2025-09 至 2027-08）
+
+**命令**：
+```bash
+# 检查时效性
+compliance-checker timeliness --file "./Examples/03_施工许可证_示范项目.pdf" --reference-time 2026-06-01
+
+# 以特定日期为基准检查
+compliance-checker timeliness --file "./Examples/03_施工许可证_示范项目.pdf" --reference-time 2028-01-01
+```
+
+#### 3. 时效性失败检查（已过期许可证）
+
+**文件**：`05_安全生产许可证_已过期.docx`
+
+**场景**：演示有效期已过期（2023-04 到期）的检测
+
+**命令**：
+```bash
+# 检查已过期文档
+compliance-checker timeliness --file "./Examples/05_安全生产许可证_已过期.docx"
+
+# 指定参考时间检查
+compliance-checker timeliness --file "./Examples/05_安全生产许可证_已过期.docx" --reference-time 2024-01-01
+```
+
+#### 4. 合规性失败检查（缺少公章）
+
+**文件**：`09_无公章批复_测试用.pdf`
+
+**场景**：演示缺少公章和签名的检测
+
+**命令**：
+```bash
+# 视觉检查：公章（应返回未找到）
+compliance-checker visual --file "./Examples/09_无公章批复_测试用.pdf" --targets "公章"
+
+# 视觉检查：签字（应返回未找到）
+compliance-checker visual --file "./Examples/09_无公章批复_测试用.pdf" --targets "法人签字"
+
+# 同时检查公章和签字
+compliance-checker visual --file "./Examples/09_无公章批复_测试用.pdf" --targets "公章,法人签字"
+```
+
+#### 批量检查示例
+
+检查 Examples 目录下所有文档的完整性：
+```bash
+compliance-checker completeness --path ./Examples --documents "立项批复,施工许可证,安全生产许可证"
+```
+
 ## 核心功能
 
 ### 1. 自然语言输入

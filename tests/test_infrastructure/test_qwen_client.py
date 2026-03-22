@@ -617,7 +617,7 @@ class TestQwenVLClientExceptions:
         验证：
         - VisualAPIError 继承自 ComplianceCheckerError
         """
-        from src.core.exceptions import ComplianceCheckerError
+        from src.compliance_checker.core.exceptions import ComplianceCheckerError
 
         assert issubclass(VisualAPIError, ComplianceCheckerError)
 
@@ -628,7 +628,7 @@ class TestQwenVLClientExceptions:
         验证：
         - ImageReadError 继承自 ComplianceCheckerError
         """
-        from src.core.exceptions import ComplianceCheckerError
+        from src.compliance_checker.core.exceptions import ComplianceCheckerError
 
         assert issubclass(ImageReadError, ComplianceCheckerError)
 

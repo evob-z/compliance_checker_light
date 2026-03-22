@@ -45,8 +45,9 @@ local-ocr = [
 ]
 
 # 云端 OCR（阿里云，轻量但需网络和付费，可选安装）
+# alibabacloud_ocr_api20210707 3.x 为当前 OpenAPI 2021-07-07 对应实现（RecognizeGeneral 等）
 cloud-ocr = [
-    "alibabacloud_ocr_api20210707>=1.0.0",
+    "alibabacloud_ocr_api20210707>=3.0.0",
     "alibabacloud-tea-openapi>=0.3.0",
 ]
 
@@ -54,7 +55,7 @@ cloud-ocr = [
 all = [
     "paddleocr>=3.0.0",
     "paddlepaddle>=3.0.0,<3.3.0",
-    "alibabacloud_ocr_api20210707>=1.0.0",
+    "alibabacloud_ocr_api20210707>=3.0.0",
     "alibabacloud-tea-openapi>=0.3.0",
 ]
 

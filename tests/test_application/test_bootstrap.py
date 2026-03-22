@@ -83,7 +83,7 @@ class TestContainer:
         assert container.config.visual_confidence_threshold == 0.75
         assert container.config.visual_default_check_type == "seal"
 
-    @patch("src.application.bootstrap.LLMClient")
+    @patch("src.compliance_checker.application.bootstrap.LLMClient")
     def test_llm_client_property_with_api_key(self, mock_llm_client_class, mock_checker_config):
         """测试 llm_client 属性 - 有 API Key 时正常初始化"""
         mock_instance = MagicMock()
@@ -109,7 +109,7 @@ class TestContainer:
         # 无 API Key 时应返回 None
         assert client is None
 
-    @patch("src.application.bootstrap.LLMClient")
+    @patch("src.compliance_checker.application.bootstrap.LLMClient")
     def test_llm_client_property_exception_handling(
         self, mock_llm_client_class, mock_checker_config
     ):
@@ -122,7 +122,7 @@ class TestContainer:
         # 异常时应返回 None
         assert client is None
 
-    @patch("src.application.bootstrap.LLMClient")
+    @patch("src.compliance_checker.application.bootstrap.LLMClient")
     def test_llm_client_lazy_loading(self, mock_llm_client_class, mock_checker_config):
         """测试 llm_client 延迟加载"""
         container = Container(mock_checker_config)
@@ -140,7 +140,7 @@ class TestContainer:
         assert not mock_llm_client_class.called
         assert client1 is client2
 
-    @patch("src.infrastructure.llm.semantic_matcher.LLMSemanticMatcher")
+    @patch("src.compliance_checker.infrastructure.llm.semantic_matcher.LLMSemanticMatcher")
     def test_semantic_matcher_property_with_config(self, mock_matcher_class, mock_checker_config):
         """测试 semantic_matcher 属性 - 配置正常时初始化"""
         mock_instance = MagicMock()
@@ -166,7 +166,7 @@ class TestContainer:
         matcher = container.semantic_matcher
         assert matcher is None
 
-    @patch("src.infrastructure.llm.semantic_matcher.LLMSemanticMatcher")
+    @patch("src.compliance_checker.infrastructure.llm.semantic_matcher.LLMSemanticMatcher")
     def test_semantic_matcher_exception_handling(self, mock_matcher_class, mock_checker_config):
         """测试 semantic_matcher 属性 - 初始化异常处理"""
         mock_matcher_class.side_effect = Exception("Init failed")
@@ -177,7 +177,7 @@ class TestContainer:
         # 异常时应返回 None
         assert matcher is None
 
-    @patch("src.application.bootstrap.QwenVLClient")
+    @patch("src.compliance_checker.application.bootstrap.QwenVLClient")
     def test_visual_client_property_available(self, mock_visual_class, mock_checker_config):
         """测试 visual_client 属性 - 可用时初始化"""
         mock_instance = MagicMock()
@@ -191,7 +191,7 @@ class TestContainer:
         mock_visual_class.assert_called_once()
         assert client is mock_instance
 
-    @patch("src.application.bootstrap.QwenVLClient")
+    @patch("src.compliance_checker.application.bootstrap.QwenVLClient")
     def test_visual_client_property_not_available(self, mock_visual_class, mock_checker_config):
         """测试 visual_client 属性 - 不可用时仍返回实例"""
         mock_instance = MagicMock()
@@ -212,7 +212,7 @@ class TestContainer:
         client = container.visual_client
         assert client is None
 
-    @patch("src.application.bootstrap.QwenVLClient")
+    @patch("src.compliance_checker.application.bootstrap.QwenVLClient")
     def test_visual_client_exception_handling(self, mock_visual_class, mock_checker_config):
         """测试 visual_client 属性 - 初始化异常处理"""
         mock_visual_class.side_effect = Exception("Visual init failed")
@@ -223,7 +223,7 @@ class TestContainer:
         # 异常时应返回 None
         assert client is None
 
-    @patch("src.application.bootstrap.PyMuPDFConverter")
+    @patch("src.compliance_checker.application.bootstrap.PyMuPDFConverter")
     def test_pdf_converter_property_initialization(self, mock_converter_class, mock_checker_config):
         """测试 pdf_converter 属性 - 正常初始化"""
         mock_instance = MagicMock()
@@ -244,7 +244,7 @@ class TestContainer:
         """测试 pdf_converter 属性 - 不同缩放因子配置"""
         mock_checker_config.pdf_zoom_factor = 3.5
 
-        with patch("src.application.bootstrap.PyMuPDFConverter") as mock_converter:
+        with patch("src.compliance_checker.application.bootstrap.PyMuPDFConverter") as mock_converter:
             mock_instance = MagicMock()
             mock_converter.return_value = mock_instance
 
@@ -255,7 +255,7 @@ class TestContainer:
             call_kwargs = mock_converter.call_args.kwargs
             assert call_kwargs["zoom_factor"] == 3.5
 
-    @patch("src.application.bootstrap.PyMuPDFConverter")
+    @patch("src.compliance_checker.application.bootstrap.PyMuPDFConverter")
     def test_pdf_converter_exception_handling(self, mock_converter_class, mock_checker_config):
         """测试 pdf_converter 属性 - 初始化异常处理"""
         mock_converter_class.side_effect = Exception("Converter init failed")
@@ -266,7 +266,7 @@ class TestContainer:
         # 异常时应返回 None
         assert converter is None
 
-    @patch("src.application.bootstrap.PyMuPDFConverter")
+    @patch("src.compliance_checker.application.bootstrap.PyMuPDFConverter")
     def test_pdf_converter_lazy_loading(self, mock_converter_class, mock_checker_config):
         """测试 pdf_converter 延迟加载"""
         mock_instance = MagicMock()
@@ -291,7 +291,7 @@ class TestContainer:
 class TestCreateContainer:
     """测试 create_container 工厂函数"""
 
-    @patch("src.application.bootstrap.CheckerConfig.from_env")
+    @patch("src.compliance_checker.application.bootstrap.CheckerConfig.from_env")
     def test_create_container_default_config(self, mock_from_env):
         """测试使用默认配置创建容器"""
         mock_config = MagicMock()
@@ -332,7 +332,7 @@ class TestContainerEdgeCases:
 
     def test_container_property_caching(self, mock_checker_config):
         """测试属性缓存行为"""
-        with patch("src.application.bootstrap.LLMClient") as mock_llm:
+        with patch("src.compliance_checker.application.bootstrap.LLMClient") as mock_llm:
             mock_llm.return_value = MagicMock()
 
             container = Container(mock_checker_config)

@@ -17,9 +17,9 @@ TimelinessChecker（时效性检查器）单元测试 - 全新业务规则版本
 import pytest
 from datetime import datetime, timedelta
 
-from src.core.checker_base import CheckStatus, CheckResult
-from src.core.document import Document, DocumentMetadata, PageContent
-from src.domain.checkers.timeliness import TimelinessChecker, ValidityPeriod, DateMatch
+from src.compliance_checker.core.checker_base import CheckStatus, CheckResult
+from src.compliance_checker.core.document import Document, DocumentMetadata, PageContent
+from src.compliance_checker.domain.checkers.timeliness import TimelinessChecker, ValidityPeriod, DateMatch
 
 # ============== 辅助函数 ==============
 

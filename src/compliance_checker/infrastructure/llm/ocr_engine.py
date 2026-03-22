@@ -11,15 +11,50 @@ OCR 引擎实现 - Infrastructure 层
 
 import os
 import sys
+import json
 import logging
 import contextlib
 import tempfile
-from typing import List, Tuple, Optional
-from pathlib import Path
+from typing import Any, List, Tuple, Optional
 
 from ...core.interfaces import OCREngineProtocol
 
 logger = logging.getLogger(__name__)
+
+# 默认 OCR 接入点（可通过环境变量 ALIBABA_CLOUD_OCR_ENDPOINT 覆盖）
+_DEFAULT_ALIYUN_OCR_ENDPOINT = "ocr-api.cn-hangzhou.aliyuncs.com"
+
+
+def _parse_recognize_general_data(data: Optional[str]) -> str:
+    """
+    解析 RecognizeGeneral 接口返回的 Data 字段（JSON 字符串）。
+
+    优先使用 content；否则按顺序拼接 prism_wordsInfo 中每项的 word。
+    """
+    if not data or not str(data).strip():
+        return ""
+    try:
+        obj: Any = json.loads(data)
+    except json.JSONDecodeError:
+        logger.warning("阿里云 OCR 返回的 Data 不是合法 JSON")
+        return ""
+    if not isinstance(obj, dict):
+        return ""
+    content = obj.get("content")
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    words_info = obj.get("prism_wordsInfo")
+    if not isinstance(words_info, list):
+        words_info = obj.get("prism_words_info")
+    if not isinstance(words_info, list):
+        return ""
+    lines: List[str] = []
+    for item in words_info:
+        if isinstance(item, dict):
+            w = item.get("word")
+            if isinstance(w, str) and w:
+                lines.append(w)
+    return "\n".join(lines)
 
 
 @contextlib.contextmanager
@@ -246,11 +281,15 @@ class AliyunOCREngine(OCREngineProtocol):
 
     需要安装: pip install alibabacloud_ocr_api20210707
     需要配置: ALIBABA_CLOUD_ACCESS_KEY_ID, ALIBABA_CLOUD_ACCESS_KEY_SECRET
+    可选: ALIBABA_CLOUD_OCR_ENDPOINT（默认杭州 ocr-api 接入点）
     特点: 轻量，需网络，按量付费
     """
 
     def __init__(
-        self, access_key_id: Optional[str] = None, access_key_secret: Optional[str] = None
+        self,
+        access_key_id: Optional[str] = None,
+        access_key_secret: Optional[str] = None,
+        endpoint: Optional[str] = None,
     ):
         """
         初始化阿里云 OCR 引擎
@@ -258,10 +297,17 @@ class AliyunOCREngine(OCREngineProtocol):
         Args:
             access_key_id: 阿里云 AccessKey ID，默认从环境变量读取
             access_key_secret: 阿里云 AccessKey Secret，默认从环境变量读取
+            endpoint: API 接入点，默认从 ALIBABA_CLOUD_OCR_ENDPOINT 或内置默认
         """
         self._access_key_id = access_key_id or os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID")
         self._access_key_secret = access_key_secret or os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET")
+        self._endpoint = (
+            endpoint
+            or os.getenv("ALIBABA_CLOUD_OCR_ENDPOINT")
+            or _DEFAULT_ALIYUN_OCR_ENDPOINT
+        )
         self._client = None
+        self._get_client()
 
     def _get_client(self):
         """初始化阿里云 OCR 客户端"""
@@ -280,7 +326,7 @@ class AliyunOCREngine(OCREngineProtocol):
                     access_key_id=self._access_key_id,
                     access_key_secret=self._access_key_secret,
                 )
-                config.endpoint = "ocr-api.cn-hangzhou.aliyuncs.com"
+                config.endpoint = self._endpoint
                 self._client = Client(config)
                 logger.info("阿里云 OCR 客户端初始化成功")
 
@@ -311,27 +357,24 @@ class AliyunOCREngine(OCREngineProtocol):
             client = self._get_client()
 
             with open(image_path, "rb") as f:
-                image_bytes = f.read()
+                request = ocr_models.RecognizeGeneralRequest(body=f)
+                response = client.recognize_general(request)
 
-            import base64
+            if not response or not response.body:
+                return ""
 
-            image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-
-            body = ocr_models.RecognizeGeneralTextRequestBody(
-                content=image_base64,
-                output_probability=True,
-            )
-            request = ocr_models.RecognizeGeneralTextRequest(body=body)
-            response = client.recognize_general_text(request)
-
-            # 解析结果
-            results = []
-            if response.body and response.body.data:
-                for word in response.body.data.words:
-                    if word and word.word:
-                        results.append(word.word)
-
-            return "\n".join(results)
+            body = response.body
+            text = _parse_recognize_general_data(body.data)
+            if not text:
+                code = getattr(body, "code", None)
+                message = getattr(body, "message", None)
+                if code or message:
+                    logger.warning(
+                        "阿里云 OCR 无文本或失败: code=%r message=%r",
+                        code,
+                        message,
+                    )
+            return text
 
         except Exception as e:
             logger.error(f"阿里云 OCR 识别失败 {image_path}: {e}")

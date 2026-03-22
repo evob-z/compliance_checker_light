@@ -14,6 +14,14 @@ htmlcov/
 # CI/CD
 .github/
 
+# Changelog (auto-generated)
+CHANGELOG.md
+
+# Docker (optional)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
 # Cache
 __pycache__/
 *.pyc

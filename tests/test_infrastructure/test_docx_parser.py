@@ -94,7 +94,7 @@ def test_parse_returns_core_document_model(parser: DocxParser, sample_docx_path:
     测试返回结果必须是 Core 层定义的 Document 模型
 
     验证：
-    - 返回类型是 src.core.document.Document
+    - 返回类型是 src.compliance_checker.core.document.Document
     - Document 的所有属性都正确设置
     - 嵌套模型（pages_content, metadata）也是 Core 层定义的类型
     """
@@ -102,7 +102,7 @@ def test_parse_returns_core_document_model(parser: DocxParser, sample_docx_path:
 
     # 验证 Document 是 Core 层定义的类型
     assert isinstance(document, Document)
-    assert document.__class__.__module__ == "src.core.document"
+    assert document.__class__.__module__ == "src.compliance_checker.core.document"
 
     # 验证基本属性
     assert isinstance(document.path, str)
@@ -115,11 +115,11 @@ def test_parse_returns_core_document_model(parser: DocxParser, sample_docx_path:
     if document.pages_content:
         first_page = document.pages_content[0]
         assert isinstance(first_page, PageContent)
-        assert first_page.__class__.__module__ == "src.core.document"
+        assert first_page.__class__.__module__ == "src.compliance_checker.core.document"
 
     # 验证 metadata 是 Core 层的 DocumentMetadata
     assert isinstance(document.metadata, DocumentMetadata)
-    assert document.metadata.__class__.__module__ == "src.core.document"
+    assert document.metadata.__class__.__module__ == "src.compliance_checker.core.document"
 
 
 def test_parse_docx_document_attributes(parser: DocxParser, sample_docx_path: Path):
