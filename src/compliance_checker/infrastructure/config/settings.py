@@ -76,6 +76,13 @@ class CheckerConfig:
     # PDF 转换器配置
     pdf_zoom_factor: float = 2.0  # PDF 渲染缩放因子，影响印章清晰度
 
+    # RAG 配置（时效性检查有效期提取）
+    rag_enabled: bool = True                       # 是否启用 Micro-RAG
+    rag_chunk_size: int = 200                      # 分块字符数
+    rag_chunk_overlap: int = 50                    # 相邻分块重叠字符数
+    rag_top_k: int = 2                             # 返回最高分 Chunk 数量
+    rag_circuit_breaker_threshold: float = 0.25   # 燃断阈値，全部得分小于此値时跳过 LLM
+
     @classmethod
     def from_env(cls) -> "CheckerConfig":
         """
@@ -111,6 +118,13 @@ class CheckerConfig:
             embed_model=embed_model,
             ocr_backend=os.getenv("OCR_BACKEND", "none"),
             pdf_zoom_factor=float(os.getenv("CC_PDF_ZOOM_FACTOR", "2.0")),
+            rag_enabled=os.getenv("CC_RAG_ENABLED", "true").lower() == "true",
+            rag_chunk_size=int(os.getenv("CC_RAG_CHUNK_SIZE", "200")),
+            rag_chunk_overlap=int(os.getenv("CC_RAG_CHUNK_OVERLAP", "50")),
+            rag_top_k=int(os.getenv("CC_RAG_TOP_K", "2")),
+            rag_circuit_breaker_threshold=float(
+                os.getenv("CC_RAG_CIRCUIT_BREAKER_THRESHOLD", "0.25")
+            ),
         )
 
 

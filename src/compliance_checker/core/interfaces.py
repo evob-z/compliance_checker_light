@@ -7,7 +7,23 @@ Domain 层只依赖这些接口，Infrastructure 层实现这些接口。
 注意：此文件只包含类型提示，不包含具体实现逻辑。
 """
 
-from typing import Protocol, List, Dict, Any, Optional, runtime_checkable
+from dataclasses import dataclass
+from typing import Protocol, List, Dict, Any, Optional, Tuple, runtime_checkable
+
+
+@dataclass
+class RetrievedChunk:
+    """
+    RAG 检索结果块
+
+    表示从文档中检索出的一个文本片段及其相关得分信息。
+    供 ValidityRetrieverProtocol 返回，由 TimelinessChecker 消费。
+    """
+
+    text: str                   # Chunk 文本内容
+    score: float                # 综合得分（语义相似度 + 关键词奖励）
+    start_pos: int              # 在原文中的起始字符位置
+    has_keyword_bonus: bool     # 是否命中关键词/日期正则加权
 
 
 @runtime_checkable
@@ -205,6 +221,33 @@ class OCREngineProtocol(Protocol):
 
         Returns:
             识别出的文字
+        """
+        ...
+
+
+@runtime_checkable
+class ValidityRetrieverProtocol(Protocol):
+    """
+    有效期 RAG 检索器接口
+
+    对文档全文执行内存向量检索，返回与有效期最相关的 Chunk 列表。
+    Infrastructure 层实现此接口（如 InMemoryValidityRetriever）。
+    """
+
+    async def retrieve(
+        self, text: str, top_k: int = 2
+    ) -> Tuple[bool, List[RetrievedChunk]]:
+        """
+        检索与有效期最相关的 Chunk。
+
+        Args:
+            text: 待检索的文档全文
+            top_k: 返回最高得分的 Chunk 数量
+
+        Returns:
+            (has_validity, chunks):
+              - has_validity=False 触发熔断，文档中无有效期信息，调用方应跳过 LLM
+              - has_validity=True  返回 top_k 个高分 RetrievedChunk
         """
         ...
 

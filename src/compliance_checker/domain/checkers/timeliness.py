@@ -27,7 +27,7 @@ from ...core.checklist_model import Checklist
 from ...core.document import Document
 
 if TYPE_CHECKING:
-    from ...core.interfaces import LLMClientProtocol
+    from ...core.interfaces import LLMClientProtocol, ValidityRetrieverProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +138,7 @@ class TimelinessChecker(BaseChecker):
         self,
         project_period: Optional[Dict[str, str]] = None,
         llm_client: Optional["LLMClientProtocol"] = None,
+        validity_retriever: Optional["ValidityRetrieverProtocol"] = None,
     ):
         """
         初始化检查器
@@ -145,9 +146,11 @@ class TimelinessChecker(BaseChecker):
         Args:
             project_period: 可选的项目周期 {"start": "YYYY-MM", "end": "YYYY-MM"}
             llm_client: LLM 客户端，用于提取有效期（可选，未提供则使用正则提取）
+            validity_retriever: Micro-RAG 检索器（可选，提供后会优先使用 RAG 定向检索）
         """
         self.project_period = project_period
         self.llm_client = llm_client
+        self.validity_retriever = validity_retriever
 
     @property
     def name(self) -> str:
@@ -407,70 +410,101 @@ class TimelinessChecker(BaseChecker):
     
     async def _extract_validity_period_async(self, text: str) -> ValidityExtractionResult:
         """
-        步骤 1: 提取有效期（Validity Period）- 关键词定位+LLM提取
-        
+        步骤 1: 提取有效期（Validity Period）
+            
         提取策略：
-        1. 先检测长期有效（不需要"有效期"关键词）
-        2. 关键词定位：寻找"有效期"关键词
-        3. 动态切片：截取关键词后50字符内的内容
+        0. 如果配置了 validity_retriever，优先走 RAG 分支：
+           a. 不需要关键词定位，直接检索整篇文档
+           b. 得分燃断：得分全部小于阈値时跳过 LLM，将 has_validity=False 返回
+           c. 对 top-K Chunk 依次调用 _extract_validity_with_llm
+           d. Top-K 均未提取有效期，回退到原有关键词+正则流程
+        1. 先检测长期有效（不需要“有效期”关键词）
+        2. 关键词定位：寻找“有效期”关键词
+        3. 动态切片：截取关键词吀50字符内的内容
         4. 快速探测：使用正则检测是否有数字/时间词
         5. LLM提取：如果检测到数字，使用LLM提取结构化有效期
         6. 正则备用：LLM失败时使用正则提取
-        7. 未知处理：如果匹配到"有效期"但无法提取具体时间，标记为UNKNOWN
-        
+        7. 未知处理：如果匹配到“有效期”但无法提取具体时间，标记为UNKNOWN
+            
         Args:
             text: 文档文本内容
-            
+                
         Returns:
             ValidityExtractionResult 对象
         """
-        # 1. 先检测长期有效（不需要"有效期"关键词）
+        # --- RAG 分支（如果配置了 validity_retriever）---
+        if self.validity_retriever is not None:
+            try:
+                has_validity, chunks = await self.validity_retriever.retrieve(text)
+                if not has_validity:
+                    # 得分燃断：文档中无有效期信息，跳过 LLM
+                    logger.debug("RAG 得分燃断，文档中无有效期信息")
+                    return ValidityExtractionResult(period=None, source="none")
+    
+                # 对 top-K Chunk 依次尝试 LLM 提取
+                if self.llm_client:
+                    for chunk in chunks:
+                        period = await self._extract_validity_with_llm(chunk.text)
+                        if period:
+                            logger.debug(
+                                f"RAG+LLM 提取有效期成功，得分={chunk.score:.3f}"
+                            )
+                            return ValidityExtractionResult(period=period, source="rag+llm")
+    
+                # Top-K 均未提取成功，回退到关键词+正则流程
+                logger.debug("RAG Top-K 均未提取到有效期，回退到关键词正则流程")
+    
+            except Exception as e:
+                logger.warning(f"RAG 检索异常，回退到原正则流程: {e}")
+        # --- RAG 分支结束 ---
+    
+        # 1. 先检测长期有效（不需要“有效期”关键词）
         if self.PERMANENT_PATTERN.search(text):
             return ValidityExtractionResult(
                 period=ValidityPeriod(value=0, unit="permanent", is_permanent=True),
                 source="regex"
             )
-        
+            
         # 2. 关键词定位
         keyword_positions = self._locate_validity_keyword(text)
-        
+            
         if not keyword_positions:
-            # 没有找到"有效期"关键词
+            # 没有找到“有效期”关键词
             return ValidityExtractionResult(period=None, source="none")
-        
+            
         found_keyword_without_time = False
-        
+            
         # 对每个关键词位置尝试提取
         for pos in keyword_positions:
             # 3. 动态切片
             context = self._extract_context_slice(text, pos, max_chars=50)
-            
+                
             # 4. 快速探测
             if not self._has_number_or_time(context):
-                # 匹配到"有效期"但没有数字/时间词
+                # 匹配到“有效期”但没有数字/时间词
                 logger.debug(f"匹配到'有效期'但无具体时间: {context}")
                 found_keyword_without_time = True
                 continue
-            
+                
             # 5. 尝试使用 LLM 提取
             if self.llm_client:
                 period = await self._extract_validity_with_llm(context)
                 if period:
                     return ValidityExtractionResult(period=period, source="llm")
-            
+                
             # 6. LLM 失败或未配置，使用正则备用
             period = self._extract_validity_regex(context)
             if period:
                 return ValidityExtractionResult(period=period, source="regex")
-        
+            
         # 7. 所有位置都尝试过
         if found_keyword_without_time:
-            # 匹配到"有效期"但无法提取具体时间，标记为UNKNOWN
+            # 匹配到“有效期”但无法提取具体时间，标记为UNKNOWN
             return ValidityExtractionResult(
                 period=ValidityPeriod(value=0, unit="unknown", is_permanent=False),
                 source="unknown"
             )
-        
+            
         return ValidityExtractionResult(period=None, source="none")
     
     def _extract_validity_period(self, text: str) -> Optional[ValidityPeriod]:

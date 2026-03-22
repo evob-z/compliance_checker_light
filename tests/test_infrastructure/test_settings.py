@@ -141,6 +141,12 @@ class TestCheckerConfig:
             "embed_max_retries",
             "ocr_backend",
             "pdf_zoom_factor",
+            # Micro-RAG 配置字段
+            "rag_enabled",
+            "rag_chunk_size",
+            "rag_chunk_overlap",
+            "rag_top_k",
+            "rag_circuit_breaker_threshold",
         }
 
         assert field_names == expected_fields

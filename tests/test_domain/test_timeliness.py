@@ -941,3 +941,180 @@ async def test_validate_config_empty(checker):
     valid, msg = checker.validate_config({})
     assert valid is True
     assert msg == ""
+
+
+# ============== Micro-RAG 注入场景测试 ==============
+
+
+class MockValidityRetriever:
+    """
+    Mock Micro-RAG 检索器
+
+    支持两种模式：
+    - 燃断模式：返回 (False, [])
+    - 正常模式：返回预设的高分 Chunk
+    """
+
+    def __init__(self, trigger_circuit_breaker: bool = False, chunks=None):
+        self.trigger_circuit_breaker = trigger_circuit_breaker
+        self._chunks = chunks or []
+
+    async def retrieve(self, text: str, top_k: int = 2):
+        if self.trigger_circuit_breaker:
+            return False, []
+        return True, self._chunks
+
+
+@pytest.mark.asyncio
+async def test_timeliness_checker_uses_rag_retriever_when_provided():
+    """
+    测试场景：注入 validity_retriever 时，异步提取走 RAG 分支
+
+    预期结果：
+    - validity_retriever 的 retrieve() 被调用
+    - 当 RAG 返回燃断 (False, []) 时，有效期提取结果为 None
+    """
+    from src.compliance_checker.core.interfaces import RetrievedChunk
+
+    retrieve_called = False
+
+    class TrackingRetriever:
+        async def retrieve(self, text: str, top_k: int = 2):
+            nonlocal retrieve_called
+            retrieve_called = True
+            # 燃断：文档中无有效期信息
+            return False, []
+
+    checker = TimelinessChecker(
+        validity_retriever=TrackingRetriever(),
+    )
+
+    text = "这是一份永久有效的文档"  # 包含长期有效
+    result = await checker._extract_validity_period_async(text)
+
+    # RAG 被调用
+    assert retrieve_called is True
+    # 燃断触发后，结果为 none（虽然文本包含长期有效，但 RAG 燃断优先）
+    assert result.source == "none"
+    assert result.period is None
+
+
+@pytest.mark.asyncio
+async def test_timeliness_checker_rag_circuit_breaker_skips_llm():
+    """
+    测试场景： RAG 燃断时不调用 LLM
+
+    预期结果：
+    - RAG 返回 (False, []) 时， LLM complete 不被调用
+    """
+    llm_called = False
+
+    class TrackingLLM:
+        async def complete(self, prompt: str, **kwargs) -> str:
+            nonlocal llm_called
+            llm_called = True
+            return '{"has_validity": false}'
+
+        async def generate_yaml(self, user_description: str, **kwargs) -> dict:
+            return {}
+
+    checker = TimelinessChecker(
+        llm_client=TrackingLLM(),
+        validity_retriever=MockValidityRetriever(trigger_circuit_breaker=True),
+    )
+
+    text = "本证书有效期1年"
+    await checker._extract_validity_period_async(text)
+
+    # LLM 不应被调用
+    assert llm_called is False
+
+
+@pytest.mark.asyncio
+async def test_timeliness_checker_rag_success_calls_llm_with_chunk():
+    """
+    测试场景： RAG 返回高分 Chunk，然后 LLM 使用该 Chunk 提取有效期
+
+    预期结果：
+    - RAG 返回 (True, [chunk]) 时， LLM 被调用
+    - LLM 应接收 chunk.text 而不是全文
+    - 最终提取结果 source 为 "rag+llm"
+    """
+    from src.compliance_checker.core.interfaces import RetrievedChunk
+
+    llm_received_text = None
+
+    class CapturingLLM:
+        async def complete(self, prompt: str, **kwargs) -> str:
+            nonlocal llm_received_text
+            llm_received_text = prompt
+            return '{"has_validity": true, "value": 3, "unit": "years", "reason": "测试"}'
+
+        async def generate_yaml(self, user_description: str, **kwargs) -> dict:
+            return {}
+
+    chunk_text = "有效期3年，自百日起至1080日止"
+    mock_chunk = RetrievedChunk(
+        text=chunk_text,
+        score=0.85,
+        start_pos=0,
+        has_keyword_bonus=True,
+    )
+
+    checker = TimelinessChecker(
+        llm_client=CapturingLLM(),
+        validity_retriever=MockValidityRetriever(
+            trigger_circuit_breaker=False,
+            chunks=[mock_chunk],
+        ),
+    )
+
+    text = "全文内容包含有效期信息，但未直接列出" * 10
+    result = await checker._extract_validity_period_async(text)
+
+    # LLM 被调用，且接收的是 Chunk 文本
+    assert llm_received_text is not None
+    assert chunk_text in llm_received_text
+    # 提取结果 source 为 rag+llm
+    assert result.source == "rag+llm"
+    assert result.period is not None
+    assert result.period.value == 3
+    assert result.period.unit == "years"
+
+
+@pytest.mark.asyncio
+async def test_timeliness_checker_rag_fallback_to_regex_when_llm_unavailable():
+    """
+    测试场景： RAG 成功但 LLM 未配置时回退到正则流程
+
+    预期结果：
+    - validity_retriever 提供，但 llm_client=None
+    - RAG Top-K 均未提取成功后，回退到关键词+正则流程
+    - 如果关键词正则最终识别有效期， source 为 "regex"
+    """
+    from src.compliance_checker.core.interfaces import RetrievedChunk
+
+    # Chunk 没有包含可被正则提取的有效期信息
+    weak_chunk = RetrievedChunk(
+        text="这个 Chunk 不包含具体数字，只提到了有效期并封",
+        score=0.60,
+        start_pos=0,
+        has_keyword_bonus=True,
+    )
+
+    checker = TimelinessChecker(
+        llm_client=None,  # LLM 未配置
+        validity_retriever=MockValidityRetriever(
+            trigger_circuit_breaker=False,
+            chunks=[weak_chunk],
+        ),
+    )
+
+    # 文本包含可被正则识别的有效期
+    text = "本证书有效期1年，由签发机关盖章"
+    result = await checker._extract_validity_period_async(text)
+
+    # 回退到正则流程，成功提取
+    assert result.period is not None
+    # source 应为 regex（回退路径）
+    assert result.source in ("regex", "llm")

@@ -98,8 +98,12 @@ async def run_timeliness(file: str, reference_time: Optional[str] = None) -> dic
     # 3. 调用 TimelinessChecker.evaluate_document()
     from ...domain.checkers.timeliness import TimelinessChecker
 
-    checker = TimelinessChecker()
-    eval_result = checker.evaluate_document(document, ref_time)
+    checker = TimelinessChecker(
+        llm_client=container.llm_client,
+        validity_retriever=container.validity_retriever,
+    )
+    # 使用异步版本以支持 LLM 和 Micro-RAG 提取
+    eval_result = await checker.evaluate_document_async(document, ref_time)
 
     # 4. 映射输出格式
     if eval_result["passed"]:
