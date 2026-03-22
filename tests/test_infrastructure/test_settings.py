@@ -14,7 +14,7 @@ import pytest
 from pathlib import Path
 from dataclasses import fields
 
-from src.infrastructure.config.settings import (
+from src.compliance_checker.infrastructure.config.settings import (
     CheckerConfig,
     DEFAULT_DOCUMENT_PATH,
     DEFAULT_OUTPUT_DIR,
@@ -23,7 +23,7 @@ from src.infrastructure.config.settings import (
     get_ocr_backend,
     get_aliyun_ocr_credentials,
 )
-from src.infrastructure.llm.config import LLMConfig
+from src.compliance_checker.infrastructure.llm.config import LLMConfig
 
 # ============== CheckerConfig 数据类测试 ==============
 

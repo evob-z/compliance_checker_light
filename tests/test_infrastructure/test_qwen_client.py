@@ -18,7 +18,7 @@ import os
 import pytest
 from pathlib import Path
 
-from src.infrastructure.visual.qwen_client import (
+from src.compliance_checker.infrastructure.visual.qwen_client import (
     QwenVLClient,
     VisualAPIError,
     ImageReadError,

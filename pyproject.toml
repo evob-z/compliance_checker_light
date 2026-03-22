@@ -1,7 +1,7 @@
 [project]
 name = "compliance-checker"
 version = "1.0.0"
-description = "项目手续合规审查助手 - MCP Server"
+description = "项目手续合规审查助手 - CLI Tool"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -20,7 +20,6 @@ classifiers = [
 ]
 
 dependencies = [
-    "mcp>=1.0.0",
     "PyMuPDF>=1.23.0",
     "python-docx>=0.8.11",
     "aiohttp>=3.9.0",
@@ -29,13 +28,20 @@ dependencies = [
     "openai>=1.0.0",
     "python-dotenv>=0.21.0",
     "python-dateutil>=2.8.0",
+    "numpy>=1.25.2,<2.6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/evob-z/compliance_checker_light"
+Repository = "https://github.com/evob-z/compliance_checker_light"
+Issues = "https://github.com/evob-z/compliance_checker_light/issues"
 
 [project.optional-dependencies]
 # 本地 OCR（PaddleOCR，体积大但无需网络，可选安装）
+# 注意：Paddle 3.3.0 在 Windows 上有 oneDNN 兼容性问题，建议使用 3.2.2
 local-ocr = [
-    "paddleocr>=2.7.0",
-    "paddlepaddle>=2.5.0",
+    "paddleocr>=3.0.0",
+    "paddlepaddle>=3.0.0,<3.3.0",
 ]
 
 # 云端 OCR（阿里云，轻量但需网络和付费，可选安装）
@@ -46,8 +52,8 @@ cloud-ocr = [
 
 # 完整安装（包含所有可选依赖）
 all = [
-    "paddleocr>=2.7.0",
-    "paddlepaddle>=2.5.0",
+    "paddleocr>=3.0.0",
+    "paddlepaddle>=3.0.0,<3.3.0",
     "alibabacloud_ocr_api20210707>=1.0.0",
     "alibabacloud-tea-openapi>=0.3.0",
 ]
@@ -59,17 +65,15 @@ dev = [
 ]
 
 [project.scripts]
-compliance-checker = "compliance_checker.interface.mcp_server:main"
+compliance-checker = "compliance_checker.cli:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-dir]
-compliance_checker = "src"
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = {find = {where = ["src"]}}
 
 [tool.black]
 line-length = 100
@@ -87,16 +91,12 @@ omit = [
     "*/core/exceptions.py",
     # YAML 兼容层（简单适配代码）
     "*/core/yaml_compat.py",
-    # 主入口和服务器（集成测试覆盖）
-    "*/server.py",
-    "*/skill.py",
-    "*/skill_formatter.py",
+    # CLI 入口（集成测试覆盖）
+    "*/cli.py",
     # 验证器（配置校验）
     "*/validators/*.py",
     # 报告生成（模板渲染）
     "*/report/*.py",
-    # 提示词模板（静态文本）
-    "*/prompts/*.py",
 ]
 
 [tool.coverage.report]

@@ -1,0 +1,38 @@
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Tests
+tests/
+test_data/
+
+# Documentation
+docs/
+htmlcov/
+
+# CI/CD
+.github/
+
+# Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment
+.env
+.env.*
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+.qoder/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+temp/

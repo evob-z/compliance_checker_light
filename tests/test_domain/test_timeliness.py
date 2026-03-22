@@ -421,7 +421,7 @@ async def test_evaluate_document_branch_a_validity_no_sign_date(checker):
     )
 
     reference_time = datetime(2024, 6, 15)
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "A"
     assert result["passed"] is False
@@ -448,7 +448,7 @@ async def test_evaluate_document_branch_b_sign_date_no_validity_passed(checker):
     )
 
     reference_time = datetime(2024, 6, 15)  # 落款日期已生效
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "B"
     assert result["passed"] is True
@@ -478,7 +478,7 @@ async def test_evaluate_document_branch_b_sign_date_no_validity_not_yet(checker)
     )
 
     reference_time = datetime(2024, 6, 15)  # 基准时间在落款日期之前
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "B"
     assert result["passed"] is False
@@ -504,7 +504,7 @@ async def test_evaluate_document_branch_c_both_valid_passed(checker):
     )
 
     reference_time = datetime(2024, 6, 15)  # 在有效期内
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "C"
     assert result["passed"] is True
@@ -534,7 +534,7 @@ async def test_evaluate_document_branch_c_not_yet_effective(checker):
     )
 
     reference_time = datetime(2024, 6, 15)  # 在落款日期之前
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "C"
     assert result["passed"] is False
@@ -559,7 +559,7 @@ async def test_evaluate_document_branch_c_expired(checker):
     )
 
     reference_time = datetime(2024, 6, 15)  # 已过期
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "C"
     assert result["passed"] is False
@@ -585,7 +585,7 @@ async def test_evaluate_document_branch_c_permanent_valid(checker):
     )
 
     reference_time = datetime(2024, 6, 15)
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "C"
     assert result["passed"] is True
@@ -612,7 +612,7 @@ async def test_evaluate_document_branch_none_no_info(checker):
     )
 
     reference_time = datetime(2024, 6, 15)
-    result = checker._evaluate_document(doc, reference_time)
+    result = checker.evaluate_document(doc, reference_time)
 
     assert result["branch"] == "NONE"
     assert result["passed"] is False

@@ -11,7 +11,7 @@ LLMConfig 配置模块单元测试
 import pytest
 from dataclasses import fields
 
-from src.infrastructure.llm.config import LLMConfig
+from src.compliance_checker.infrastructure.llm.config import LLMConfig
 
 
 class TestLLMConfig:

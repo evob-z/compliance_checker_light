@@ -16,7 +16,7 @@ LLMSemanticMatcher 集成测试
 import os
 import pytest
 
-from src.infrastructure.llm.semantic_matcher import LLMSemanticMatcher
+from src.compliance_checker.infrastructure.llm.semantic_matcher import LLMSemanticMatcher
 
 # ============== 环境配置检查 ==============
 

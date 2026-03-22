@@ -14,9 +14,9 @@ PDFParser 集成测试
 import pytest
 from pathlib import Path
 
-from src.infrastructure.parsers.pdf_parser import PDFParser, parse_pdf
-from src.core.document import Document, DocumentType, PageContent, DocumentMetadata
-from src.core.exceptions import DocumentParseError
+from src.compliance_checker.infrastructure.parsers.pdf_parser import PDFParser, parse_pdf
+from src.compliance_checker.core.document import Document, DocumentType, PageContent, DocumentMetadata
+from src.compliance_checker.core.exceptions import DocumentParseError
 
 # ============== 测试 Fixtures ==============
 

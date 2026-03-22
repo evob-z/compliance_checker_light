@@ -3,8 +3,7 @@ Application 层 bootstrap 模块单元测试
 
 测试范围：
 - Container 依赖注入容器的初始化和属性访问
-- initialize_registry 检查器注册表的初始化
-- initialize_app 应用初始化流程
+- create_container 工厂函数
 
 测试策略：
 - 使用 Mock 对象隔离 Infrastructure 层依赖
@@ -16,9 +15,8 @@ import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime
 
-from src.application.bootstrap import Container, initialize_registry, initialize_app
-from src.infrastructure.config.settings import CheckerConfig
-from src.core.checker_registry import CheckerRegistry
+from src.compliance_checker.application.bootstrap import Container, create_container
+from src.compliance_checker.infrastructure.config.settings import CheckerConfig
 
 
 class MockLLMConfig:
@@ -290,184 +288,27 @@ class TestContainer:
         assert converter1 is converter2
 
 
-class TestInitializeRegistry:
-    """测试 initialize_registry 函数"""
-
-    @pytest.fixture(autouse=True)
-    def reset_registry(self):
-        """每个测试前重置注册表单例"""
-        CheckerRegistry._instance = None
-        CheckerRegistry._initialized = False
-        yield
-        # 测试后清理
-        CheckerRegistry._instance = None
-        CheckerRegistry._initialized = False
-
-    @patch("src.application.bootstrap.CompletenessChecker")
-    @patch("src.application.bootstrap.TimelinessChecker")
-    @patch("src.application.bootstrap.VisualChecker")
-    def test_initialize_registry_success(
-        self,
-        mock_visual_checker,
-        mock_timeliness_checker,
-        mock_completeness_checker,
-        mock_checker_config,
-    ):
-        """测试注册表初始化成功"""
-        # 设置 Mock
-        mock_completeness_instance = MagicMock()
-        mock_completeness_instance.name = "completeness"
-        mock_completeness_checker.return_value = mock_completeness_instance
-
-        mock_timeliness_instance = MagicMock()
-        mock_timeliness_instance.name = "timeliness"
-        mock_timeliness_checker.return_value = mock_timeliness_instance
-
-        mock_visual_instance = MagicMock()
-        mock_visual_instance.name = "visual"
-        mock_visual_checker.return_value = mock_visual_instance
-
-        # 创建带 Mock 属性的 Container
-        container = MagicMock()
-        container.config = mock_checker_config
-        container.semantic_matcher = MagicMock()
-        container.visual_client = MagicMock()
-        container.visual_client.is_available.return_value = True
-        container.pdf_converter = MagicMock()
-
-        registry = initialize_registry(container)
-
-        # 验证返回的是 CheckerRegistry 实例
-        assert isinstance(registry, CheckerRegistry)
-
-        # 验证检查器被注册
-        mock_completeness_checker.assert_called_once()
-        mock_timeliness_checker.assert_called_once()
-        mock_visual_checker.assert_called_once()
-
-        # 验证 VisualChecker 被注入 pdf_converter
-        call_kwargs = mock_visual_checker.call_args.kwargs
-        assert "pdf_converter" in call_kwargs
-
-    def test_initialize_registry_with_none_container(self):
-        """测试传入 None container 时的异常处理"""
-        # 传入 None 时应该能正常处理（内部捕获异常并记录日志）
-        registry = initialize_registry(None)
-
-        # 验证返回的是 CheckerRegistry 实例
-        assert isinstance(registry, CheckerRegistry)
-        # 验证所有检查器都被标记为不可用
-        assert len(registry.list_available()) == 0
-
-    @patch("src.application.bootstrap.CompletenessChecker")
-    def test_initialize_registry_completeness_fallback(
-        self, mock_completeness_checker, mock_checker_config
-    ):
-        """测试完整性检查器降级逻辑 - semantic_matcher 为 None"""
-        mock_instance = MagicMock()
-        mock_instance.name = "completeness"
-        mock_completeness_checker.return_value = mock_instance
-
-        container = MagicMock()
-        container.config = mock_checker_config
-        container.semantic_matcher = None  # 模拟 matcher 不可用
-
-        # 需要 patch LLMSemanticMatcher 的导入
-        with patch("src.infrastructure.llm.semantic_matcher.LLMSemanticMatcher") as mock_fallback:
-            mock_fallback_instance = MagicMock()
-            mock_fallback.return_value = mock_fallback_instance
-
-            registry = initialize_registry(container)
-
-            # 验证降级方案被使用
-            mock_fallback.assert_called_once()
-            # 验证 CompletenessChecker 被创建两次（一次失败，一次降级）
-            assert mock_completeness_checker.call_count >= 1
-
-    @patch("src.application.bootstrap.TimelinessChecker")
-    def test_initialize_registry_timeliness_exception(
-        self, mock_timeliness_checker, mock_checker_config
-    ):
-        """测试时效性检查器注册异常处理"""
-        mock_timeliness_checker.side_effect = Exception("Init error")
-
-        container = MagicMock()
-        container.config = mock_checker_config
-        container.semantic_matcher = MagicMock()
-        container.visual_client = None
-
-        registry = initialize_registry(container)
-
-        # 即使异常也应返回注册表
-        assert isinstance(registry, CheckerRegistry)
-        # timeliness 应被标记为不可用
-        assert "timeliness" in registry._unavailable
-
-
-class TestInitializeApp:
-    """测试 initialize_app 函数"""
-
-    @pytest.fixture(autouse=True)
-    def reset_registry(self):
-        """每个测试前重置注册表单例"""
-        CheckerRegistry._instance = None
-        CheckerRegistry._initialized = False
-        yield
-        CheckerRegistry._instance = None
-        CheckerRegistry._initialized = False
+class TestCreateContainer:
+    """测试 create_container 工厂函数"""
 
     @patch("src.application.bootstrap.CheckerConfig.from_env")
-    @patch("src.application.bootstrap.initialize_registry")
-    def test_initialize_app_with_default_config(self, mock_init_registry, mock_from_env):
-        """测试使用默认配置初始化应用"""
+    def test_create_container_default_config(self, mock_from_env):
+        """测试使用默认配置创建容器"""
         mock_config = MagicMock()
         mock_from_env.return_value = mock_config
 
-        mock_registry = MagicMock()
-        mock_init_registry.return_value = mock_registry
+        container = create_container()
 
-        registry, container = initialize_app()
-
-        # 验证从环境变量加载配置
         mock_from_env.assert_called_once()
-
-        # 验证返回的容器包含配置
         assert container.config == mock_config
 
-        # 验证返回的注册表
-        assert registry == mock_registry
+    def test_create_container_custom_config(self, mock_checker_config):
+        """测试使用自定义配置创建容器"""
+        container = create_container(config=mock_checker_config)
 
-    def test_initialize_app_with_custom_config(self, mock_checker_config):
-        """测试使用自定义配置初始化应用"""
-        with patch("src.application.bootstrap.initialize_registry") as mock_init_registry:
-            mock_registry = MagicMock()
-            mock_init_registry.return_value = mock_registry
-
-            registry, container = initialize_app(config=mock_checker_config)
-
-            # 验证使用传入的配置
-            assert container.config == mock_checker_config
-            assert container.config.similarity_threshold == 0.8
-
-            # 验证注册表被初始化
-            mock_init_registry.assert_called_once_with(container)
-
-    def test_initialize_app_return_types(self, mock_checker_config):
-        """测试 initialize_app 返回值类型"""
-        with patch("src.application.bootstrap.initialize_registry") as mock_init_registry:
-            mock_registry = MagicMock()
-            mock_init_registry.return_value = mock_registry
-
-            registry, container = initialize_app(config=mock_checker_config)
-
-            # 验证返回类型
-            assert isinstance(registry, MagicMock)  # 实际是 Mock，但真实返回是 CheckerRegistry
-            assert isinstance(container, Container)
-
-            # 验证是元组
-            result = initialize_app(config=mock_checker_config)
-            assert isinstance(result, tuple)
-            assert len(result) == 2
+        assert isinstance(container, Container)
+        assert container.config == mock_checker_config
+        assert container.config.similarity_threshold == 0.8
 
 
 class TestContainerEdgeCases:

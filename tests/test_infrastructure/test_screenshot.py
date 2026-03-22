@@ -18,7 +18,7 @@ import base64
 from pathlib import Path
 import tempfile
 
-from src.infrastructure.visual.screenshot import (
+from src.compliance_checker.infrastructure.visual.screenshot import (
     capture_page,
     capture_full_page_base64,
     capture_region_base64,
@@ -26,7 +26,7 @@ from src.infrastructure.visual.screenshot import (
     get_page_count,
     HAS_FITZ,
 )
-from src.core.exceptions import DocumentParseError
+from src.compliance_checker.core.exceptions import DocumentParseError
 
 # ============== 测试 Fixtures ==============
 

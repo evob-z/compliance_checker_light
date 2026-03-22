@@ -16,7 +16,7 @@ RegionDetector 集成测试
 import pytest
 from pathlib import Path
 
-from src.infrastructure.visual.region_detector import (
+from src.compliance_checker.infrastructure.visual.region_detector import (
     TextRegion,
     RegionDetector,
     PaddleOCRRegionDetector,
@@ -403,11 +403,11 @@ class TestPaddleOCRRegionDetectorReal:
 
         result = detector.locate_keyword(str(sample_image_path), keyword)
 
-        if result:
-            assert "page" in result
-            assert "bbox" in result
-            assert "text" in result
-            assert len(result["bbox"]) == 4
+        assert result is not None, "关键词来自本图 OCR 首条文本的子串，应能定位"
+        assert "page" in result
+        assert "bbox" in result
+        assert "text" in result
+        assert len(result["bbox"]) == 4
 
 
 # ============== PDFRegionDetector 真实测试 ==============
@@ -551,7 +551,7 @@ class TestWithoutDependencies:
         - locate_by_text() 返回 None
         """
         # 临时移除 fitz
-        import src.infrastructure.visual.region_detector as module
+        import src.compliance_checker.infrastructure.visual.region_detector as module
 
         detector = PDFRegionDetector()
         detector._fitz = None  # 模拟未安装

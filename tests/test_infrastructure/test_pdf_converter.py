@@ -9,8 +9,8 @@ import pytest
 from typing import List
 from io import BytesIO
 
-from src.infrastructure.converter.pdf_converter import PyMuPDFConverter
-from src.core.interfaces import PDFConverterProtocol
+from src.compliance_checker.infrastructure.converter.pdf_converter import PyMuPDFConverter
+from src.compliance_checker.core.interfaces import PDFConverterProtocol
 
 
 class TestPyMuPDFConverter:

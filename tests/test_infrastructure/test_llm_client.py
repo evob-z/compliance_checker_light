@@ -17,9 +17,9 @@ LLMClient 集成测试
 import os
 import pytest
 
-from src.infrastructure.llm.client import LLMClient, _has_openai
-from src.infrastructure.llm.config import LLMConfig
-from src.core.exceptions import CheckExecutionError
+from src.compliance_checker.infrastructure.llm.client import LLMClient, _has_openai
+from src.compliance_checker.infrastructure.llm.config import LLMConfig
+from src.compliance_checker.core.exceptions import CheckExecutionError
 
 # ============== 环境配置检查 ==============
 
