@@ -1,14 +1,13 @@
-# Compliance Checker MCP Service
+# Compliance Checker
 
 <div align="center">
   
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![MCP Protocol](https://img.shields.io/badge/MCP-1.0-brightgreen.svg)](https://modelcontextprotocol.io/)
 [![Qwen-VL Support](https://img.shields.io/badge/Visual_Model-Qwen--VL-purple.svg)](https://help.aliyun.com/zh/dashscope/developer-reference/vl-plus-quick-start)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**基于 MCP（Model Context Protocol）的 AI 驱动文档合规审查 Skill**
+**AI 驱动的文档合规审查 Python 库**
 
 [中文文档](README.md) • [English](README_EN.md)
 
@@ -16,13 +15,12 @@
 
 ## 项目概述
 
-本项目是一个 AI Skill，提供自然语言接口的文档合规审查能力：
-1. **自然语言输入** - 用中文描述检查要求，自动生成检查清单
-2. **资料完整性核对** - 检查必需文档是否齐全（支持语义匹配）
-3. **资料时效性核对** - 验证文件有效期是否覆盖项目周期
-4. **基础合规性核对** - 检查公章、签字、文件编号等要素
-5. **视觉检测** - 使用 Qwen-VL 识别印章/签名
-6. **文本输出** - 返回自然语言描述的检查结果
+本项目是一个 Python 库，提供文档合规审查能力：
+1. **资料完整性核对** - 检查必需文档是否齐全（支持语义匹配）
+2. **资料时效性核对** - 验证文件有效期是否覆盖项目周期
+3. **基础合规性核对** - 检查公章、签字、文件编号等要素
+4. **视觉检测** - 使用 Qwen-VL 识别印章/签名
+5. **JSON 输出** - 返回结构化检查结果
 
 ## 系统架构
 
@@ -30,25 +28,22 @@
 
 ```mermaid
 graph TD
-    A[AI Agent / 大模型] -->|自然语言需求 + 路径| B(ComplianceSkill 接口)
-    B --> C{LLM 清单生成器}
-    C -->|生成 YAML 规则| D[声明式检查引擎]
+    A[Python API] -->|调用| B[命令处理器]
+    B --> C[文档解析器 Parser]
+    C -->|提取 PDF/Word 文本| D[声明式检查引擎]
     
-    B --> E[文档解析器 Parser]
-    E -->|提取 PDF/Word 文本| D
+    D --> E[完整性检查 Completeness]
+    D --> F[时效性检查 Timeliness]
+    D --> G[合规性检查 Compliance]
     
-    D --> F[完整性检查 Completeness]
-    D --> G[时效性检查 Timeliness]
-    D --> H[合规性检查 Compliance]
+    G -->|需要验证公章/签字| H[Qwen-VL 视觉校验]
     
-    H -->|需要验证公章/签字| I[Qwen-VL 视觉校验]
+    E --> I[结果汇总 Formatter]
+    F --> I
+    G --> I
+    H --> I
     
-    F --> J[结果汇总 Formatter]
-    G --> J
-    H --> J
-    I --> J
-    
-    J -->|结构化文本报告| A
+    I -->|JSON 输出| A
 ```
 
 ## 项目结构
@@ -57,17 +52,10 @@ graph TD
 
 ```
 src/compliance_checker/
-├── interface/                    # 接口层 - MCP 协议适配
-│   └── mcp_server.py            # MCP Server 入口
-│
 ├── application/                  # 应用层 - 用例编排
-│   ├── skill.py                 # Skill Facade（对外接口）
+│   ├── commands/                # 命令实现
 │   ├── bootstrap.py             # 依赖注入初始化
-│   ├── formatter.py             # 结果格式化
-│   ├── use_cases/               # 用例实现
-│   │   └── project_check.py     # 项目检查用例
-│   └── prompts/                 # LLM 提示词模板
-│       └── checklist_prompt.py
+│   └── formatter.py             # 结果格式化
 │
 ├── domain/                       # 领域层 - 业务逻辑
 │   ├── checkers/                # 检查器实现
@@ -103,7 +91,7 @@ src/compliance_checker/
 │   └── config/                  # 配置管理
 │       └── settings.py
 │
-└── server.py                    # 应用入口
+└── cli.py                       # CLI 入口（可选）
 ```
 
 ## 配置
@@ -130,19 +118,6 @@ VISION_MODEL=qwen3-vl-flash  # 默认使用 OpenAI 兼容模式模型，留空�
 
 # OCR 配置（可选，默认不启用）
 # OCR_BACKEND=none  # none（默认）/ paddle（本地）/ aliyun（云端）
-```
-
-### MCP Server 配置示例（Cherry Studio）
-
-```yaml
-# .openclaw/mcp.yaml
-mcp_servers:
-  compliance-checker:
-    type: inline
-    command: python -m compliance_checker.server
-    cwd: /path/to/compliance-checker
-    env:
-      PYTHONPATH: /path/to/compliance-checker/src
 ```
 
 ## 安装说明
@@ -276,41 +251,7 @@ python run_check.py
 
 ## 使用方法
 
-### 作为 Skill 使用（推荐）
-
-```python
-from compliance_checker.skill import ComplianceSkill
-
-skill = ComplianceSkill()
-result = await skill.check(
-    project_path="/path/to/documents",
-    requirements="检查是否有发票，验证日期是否在2026年3月10日前，检查是否有印章",
-    project_period={"start": "2026-01", "end": "2026-12"}
-)
-
-print(result["issues_description"])  # 查看检查结果
-```
-
-### 作为 MCP Server 使用
-
-配置 `.openclaw/mcp.yaml`：
-```yaml
-mcp_servers:
-  compliance-checker:
-    type: inline
-    command: python -m compliance_checker.server
-    cwd: /path/to/compliance-checker
-    env:
-      PYTHONPATH: /path/to/compliance-checker/src
-      LLM_API_KEY: ${LLM_API_KEY}
-```
-
-然后使用自然语言调用：
-```
-检查 /path/to/documents 文件夹中的发票，验证日期是否有效，是否有印章
-```
-
-### 示例文件与命令
+### Python API 示例
 
 `Examples/` 目录包含 4 个测试文档，演示不同检查场景：
 
@@ -320,16 +261,28 @@ mcp_servers:
 
 **场景**：检查公章、签字、文件编号、日期等要素是否齐全
 
-**命令**：
-```bash
+**代码**：
+```python
+from compliance_checker.application.commands.completeness_cmd import run_completeness
+from compliance_checker.application.commands.timeliness_cmd import run_timeliness
+from compliance_checker.application.commands.visual_cmd import run_visual
+
 # 检查文档完整性
-compliance-checker completeness --path ./Examples --documents "立项批复"
+completeness = await run_completeness(
+    path="./Examples",
+    documents=["立项批复"]
+)
 
 # 检查时效性
-compliance-checker timeliness --file "./Examples/01_立项批复_示范智慧城市项目.pdf"
+timeliness = await run_timeliness(
+    file="./Examples/01_立项批复_示范智慧城市项目.pdf"
+)
 
 # 视觉检查：公章和签字
-compliance-checker visual --file "./Examples/01_立项批复_示范智慧城市项目.pdf" --targets "公章,法人签字"
+visual = await run_visual(
+    file="./Examples/01_立项批复_示范智慧城市项目.pdf",
+    targets=["公章", "法人签字"]
+)
 ```
 
 #### 2. 有效期检查（施工许可证）
@@ -338,13 +291,19 @@ compliance-checker visual --file "./Examples/01_立项批复_示范智慧城市�
 
 **场景**：验证文件有效期是否覆盖项目周期（2025-09 至 2027-08）
 
-**命令**：
-```bash
+**代码**：
+```python
 # 检查时效性
-compliance-checker timeliness --file "./Examples/03_施工许可证_示范项目.pdf" --reference-time 2026-06-01
+result = await run_timeliness(
+    file="./Examples/03_施工许可证_示范项目.pdf",
+    reference_time="2026-06-01"
+)
 
 # 以特定日期为基准检查
-compliance-checker timeliness --file "./Examples/03_施工许可证_示范项目.pdf" --reference-time 2028-01-01
+result = await run_timeliness(
+    file="./Examples/03_施工许可证_示范项目.pdf",
+    reference_time="2028-01-01"
+)
 ```
 
 #### 3. 时效性失败检查（已过期许可证）
@@ -353,13 +312,18 @@ compliance-checker timeliness --file "./Examples/03_施工许可证_示范项目
 
 **场景**：演示有效期已过期（2023-04 到期）的检测
 
-**命令**：
-```bash
+**代码**：
+```python
 # 检查已过期文档
-compliance-checker timeliness --file "./Examples/05_安全生产许可证_已过期.docx"
+result = await run_timeliness(
+    file="./Examples/05_安全生产许可证_已过期.docx"
+)
 
 # 指定参考时间检查
-compliance-checker timeliness --file "./Examples/05_安全生产许可证_已过期.docx" --reference-time 2024-01-01
+result = await run_timeliness(
+    file="./Examples/05_安全生产许可证_已过期.docx",
+    reference_time="2024-01-01"
+)
 ```
 
 #### 4. 合规性失败检查（缺少公章）
@@ -368,44 +332,46 @@ compliance-checker timeliness --file "./Examples/05_安全生产许可证_已过
 
 **场景**：演示缺少公章和签名的检测
 
-**命令**：
-```bash
+**代码**：
+```python
 # 视觉检查：公章（应返回未找到）
-compliance-checker visual --file "./Examples/09_无公章批复_测试用.pdf" --targets "公章"
+result = await run_visual(
+    file="./Examples/09_无公章批复_测试用.pdf",
+    targets=["公章"]
+)
 
 # 视觉检查：签字（应返回未找到）
-compliance-checker visual --file "./Examples/09_无公章批复_测试用.pdf" --targets "法人签字"
+result = await run_visual(
+    file="./Examples/09_无公章批复_测试用.pdf",
+    targets=["法人签字"]
+)
 
 # 同时检查公章和签字
-compliance-checker visual --file "./Examples/09_无公章批复_测试用.pdf" --targets "公章,法人签字"
+result = await run_visual(
+    file="./Examples/09_无公章批复_测试用.pdf",
+    targets=["公章", "法人签字"]
+)
 ```
 
 #### 批量检查示例
 
 检查 Examples 目录下所有文档的完整性：
-```bash
-compliance-checker completeness --path ./Examples --documents "立项批复,施工许可证,安全生产许可证"
+```python
+result = await run_completeness(
+    path="./Examples",
+    documents=["立项批复", "施工许可证", "安全生产许可证"]
+)
 ```
 
 ## 核心功能
 
-### 1. 自然语言输入
-
-用中文描述检查要求，LLM 自动生成检查清单：
-```python
-requirements = """
-审查建设工程项目，需要立项批复、环评批复、施工许可证，
-检查所有批文是否有公章，证件是否在有效期内
-"""
-```
-
-### 2. 完整性核对
+### 1. 完整性核对
 
 检查必需文档是否齐全：
 - **精确匹配**：文件名包含清单名称
 - **语义匹配**：使用 LLM 嵌入模型计算相似度（默认阈值 0.75）
 
-### 3. 时效性核对
+### 2. 时效性核对
 
 验证文件有效期：
 - 提取签发日期、有效期起止
@@ -413,7 +379,7 @@ requirements = """
 - 判断有效期是否覆盖项目周期
 - 支持有效期描述提取（如"有效期一年"）
 
-### 4. 合规性核对
+### 3. 合规性核对
 
 检查基础合规要点：
 - **公章**：视觉检测
@@ -421,7 +387,7 @@ requirements = """
 - **文件编号**：正则匹配
 - **日期**：提取验证
 
-### 5. 视觉检测
+### 4. 视觉检测
 
 使用 Qwen-VL 进行视觉确认：
 - 自动为印章/签字检查启用视觉检测
@@ -430,32 +396,30 @@ requirements = """
 
 ## 快速测试
 
-```bash
-# 测试发票检查
-python run_check.py
-```
-
-或使用 Python：
 ```python
 import asyncio
-from compliance_checker.skill import ComplianceSkill
+from compliance_checker.application.commands.completeness_cmd import run_completeness
+from compliance_checker.cli import check_health
 
 async def test():
-    skill = ComplianceSkill()
-    result = await skill.check(
-        project_path="./docs",
-        requirements="检查是否有发票，验证日期是否有效，是否有印章",
-        project_period={"start": "2026-01", "end": "2026-12"}
+    # 健康检查
+    health = await check_health()
+    print(health["status"])
+    
+    # 测试完整性检查
+    result = await run_completeness(
+        path="./Examples",
+        documents=["立项批复"]
     )
-    print(result["issues_description"])
+    print(result)
 
 asyncio.run(test())
 ```
 
 ## 技术特点
 
-- **自然语言接口** - 无需编写 YAML，用中文描述检查要求
-- **LLM 驱动** - 自动生成检查清单，语义匹配使用 LLM 嵌入 API
+- **Python API 优先** - 简洁的 Python 接口，直接返回字典
+- **LLM 驱动** - 语义匹配使用 LLM 嵌入 API，日期提取使用 LLM
 - **视觉优先** - 印章/签名检测使用 Qwen-VL，不依赖文本关键词
 - **轻量级** - 默认无 OCR，可选安装 PaddleOCR/阿里云 OCR
 - **异步架构** - 所有检查任务并行执行
@@ -487,19 +451,19 @@ asyncio.run(test())
 - 支持备用方案（字符级嵌入）
 
 ### 5. LLM 依赖
-- 清单生成需要 LLM API
-- 语义匹配优先使用 LLM 嵌入
+- 语义匹配使用 LLM 嵌入 API
+- 日期提取使用 LLM
 - 支持 OpenAI 兼容 API（DashScope、Moonshot 等）
 
 ---
 
-**项目状态**: MCP Service 版本已稳定 ✅  
-**最后更新**: 2026-03-15  
+**项目状态**: Python API 版本已稳定
+**最后更新**: 2026-03-22
 **维护者**: evob
 
 ## 架构特点
 
-- **Clean Architecture 五层架构**: Interface → Application → Domain → Core → Infrastructure
+- **Clean Architecture 四层架构**: Application → Domain → Core → Infrastructure
 - **依赖倒置**: 内层定义接口，外层实现接口
 - **依赖注入**: 通过 `bootstrap.py` 完成所有依赖组装
 - **声明式检查引擎**: 根据清单配置自动执行检查

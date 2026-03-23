@@ -16,8 +16,6 @@ import logging
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 __version__ = "1.0.0"
 
 logger = logging.getLogger(__name__)
@@ -25,18 +23,23 @@ logger = logging.getLogger(__name__)
 
 def _load_env():
     """
-    多路径 .env 加载，兼容多种部署场景。
+    环境变量加载（已弃用）。
 
-    加载顺序（不覆盖已有环境变量）：
-    1. 系统环境变量（最高优先级，始终保留）
-    2. ~/.compliance-checker/.env（用户配置目录）
-    3. cwd/.env（保持向后兼容）
+    此函数保留用于向后兼容，但不再执行任何操作。
+    环境变量现在由调用方（如 OpenClaw 框架）在进程启动时注入，
+    而非从 .env 文件加载。
+
+    这样设计的好处：
+    1. 敏感信息（API Key）不会落地到硬盘
+    2. 符合 MCP/Tool Calling 框架的安全最佳实践
+    3. 测试环境仍通过 conftest.py 加载 .env
+
+    本地开发时，请手动设置环境变量或使用：
+        source .env
     """
-    home_env = Path.home() / ".compliance-checker" / ".env"
-    if home_env.exists():
-        load_dotenv(home_env, override=False)
-
-    load_dotenv(override=False)
+    # 环境变量由 OpenClaw 等框架在启动时注入
+    # 不再从 .env 文件加载
+    pass
 
 
 def _setup_logging():

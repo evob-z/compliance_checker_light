@@ -14,8 +14,11 @@ htmlcov/
 # CI/CD
 .github/
 
-# Changelog (auto-generated)
-CHANGELOG.md
+# Scripts (development)
+scripts/
+
+# Windows reserved file
+nul
 
 # Docker (optional)
 Dockerfile
@@ -44,3 +47,6 @@ Thumbs.db
 
 # Temp
 temp/
+
+# Qoder config
+.qoder/

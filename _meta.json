@@ -1,8 +1,14 @@
 {
   "name": "compliance-checker",
-  "version": "1.0.0",
-  "description": "项目手续合规审查 CLI Skill",
+  "version": "1.1.2",
+  "type": "python",
+  "install": "pip install -e .",
+  "entrypoint": "compliance-checker",
+  "description": "项目手续合规审查 Python 库",
   "author": "evob",
-  "tags": ["compliance", "document-check", "cli", "ocr", "pdf"],
-  "license": "MIT"
+  "tags": ["compliance", "document-check", "python", "ocr", "pdf"],
+  "license": "MIT",
+  "requires": {
+    "env": ["LLM_API_KEY"]
+  }
 }

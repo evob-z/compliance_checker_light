@@ -1,3 +1,31 @@
+## [v1.1.2] - 2026-03-22
+
+### Changed
+- SKILL.md: 环境变量声明改为 env_required/env_optional 分离，仅 LLM_API_KEY 为必需
+- SKILL.md: 移除路径探测权限，明确禁止 Agent 自主探测文件系统
+- SKILL.md: 新增数据隐私与合规声明章节
+- _meta.json: 添加 type: cli-tool 声明
+- README.md: 清理过时的 MCP Service 相关内容，更新为 CLI Tool 定位
+
+---
+
+## [v1.1.0] - 2026-03-22
+
+### Added
+- 新增 RAG 检索模块，支持法规检索增强时效性检查
+- 新增 CLI 命令行工具支持
+- 添加示例文档 (Examples/)
+
+### Changed
+- 重构时效性检查器，增强日期解析逻辑
+- 改进 OCR 引擎功能
+- 重构项目结构，优化 OpenClaw 扫描报告
+
+### Fixed
+- 修复 OpenClaw 扫描报告的元数据和安全问题
+
+---
+
 ## [v1.0.0] - 2026-03-15
 
 ## What's Changed

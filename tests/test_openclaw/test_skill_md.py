@@ -117,10 +117,11 @@ class TestMetadata:
 
     def test_requires_env(self, frontmatter):
         requires = frontmatter["metadata"]["openclaw"]["requires"]
-        assert "env" in requires, "requires must include 'env'"
-        env = requires["env"]
-        assert isinstance(env, list), "'env' must be a list"
-        assert "LLM_API_KEY" in env, "'env' must include 'LLM_API_KEY'"
+        # SKILL.md 使用 env_required 表示必需的环境变量
+        assert "env_required" in requires, "requires must include 'env_required'"
+        env_required = requires["env_required"]
+        assert isinstance(env_required, list), "'env_required' must be a list"
+        assert "LLM_API_KEY" in env_required, "'env_required' must include 'LLM_API_KEY'"
 
 
 class TestBody:
