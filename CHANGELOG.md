@@ -1,3 +1,19 @@
+## [v1.1.4] - 2026-03-23
+
+### Fixed
+- 修复 visual（视觉检查）API Key fallback 未生效的问题
+
+---
+
+## [v1.1.3] - 2026-03-23
+
+### Fixed
+- _meta.json: 修复 `requires.env` 只包含必需的 `LLM_API_KEY`，与 SKILL.md 保持一致
+- _meta.json: 添加 `requires.bins` 字段声明依赖的二进制文件
+- _meta.json: 统一 `install` 字段为 `pip install compliance-checker`
+
+---
+
 ## [v1.1.2] - 2026-03-22
 
 ### Changed

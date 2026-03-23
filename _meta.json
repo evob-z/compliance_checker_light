@@ -1,14 +1,15 @@
 {
   "name": "compliance-checker",
-  "version": "1.1.2",
+  "version": "1.1.4",
   "type": "python",
-  "install": "pip install -e .",
+  "install": "pip install compliance-checker",
   "entrypoint": "compliance-checker",
   "description": "项目手续合规审查 Python 库",
   "author": "evob",
   "tags": ["compliance", "document-check", "python", "ocr", "pdf"],
   "license": "MIT",
   "requires": {
+    "bins": ["python", "pip", "compliance-checker"],
     "env": ["LLM_API_KEY"]
   }
 }

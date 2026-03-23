@@ -1,6 +1,6 @@
 ---
 name: compliance-checker
-version: 1.1.2
+version: 1.1.4
 license: MIT
 description: >
   AI 驱动的项目手续合规审查 Skill。通过 Python API 检查 PDF/Word/图片文档的

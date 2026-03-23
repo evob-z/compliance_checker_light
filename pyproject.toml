@@ -1,6 +1,6 @@
 [project]
 name = "compliance-checker"
-version = "1.1.2"
+version = "1.1.4"
 description = "项目手续合规审查助手 - CLI Tool"
 readme = "README.md"
 requires-python = ">=3.10"
